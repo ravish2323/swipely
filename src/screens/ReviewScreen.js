@@ -7,16 +7,14 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  SafeAreaView,
-  ScrollView,
   Modal,
-  Platform,
   PanResponder,
   Animated,
   Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SwipeCard from '../components/SwipeCard';
+import ScreenShell from '../components/ScreenShell';
 import {
   getPendingTransactions,
   updateTransactionStatus,
@@ -387,9 +385,11 @@ const ReviewScreen = ({ navigation }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
+  const remainingCount = filteredTransactions.length;
+
+  const renderContent = () => {
+    if (loading) {
+      return (
         <View style={styles.splashContainer}>
           <View style={styles.splashContent}>
             <Ionicons name="flash" size={64} color="#8B5CF6" />
@@ -397,67 +397,14 @@ const ReviewScreen = ({ navigation }) => {
             <ActivityIndicator size="small" color="#8B5CF6" style={styles.splashLoader} />
           </View>
         </View>
-      </SafeAreaView>
-    );
-  }
+      );
+    }
 
-  const currentCard = filteredTransactions[0];
-  const remainingCount = filteredTransactions.length;
+    const currentCard = filteredTransactions[0];
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Purple Header */}
-        <View style={styles.header}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.headerTitle}>Today's Inbox</Text>
-        </View>
-
-        {/* Filter Row (White Background) */}
-        <View style={styles.filterSection}>
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.dateFilterPill, dateFilter === 'today' && styles.dateFilterPillActive]}
-              onPress={async () => {
-                setDateFilter('today');
-                // Auto-scan when filter is clicked
-                await handleScan();
-              }}
-            >
-              <Text style={[styles.dateFilterPillText, dateFilter === 'today' && styles.dateFilterPillTextActive]}>
-                Today
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dateFilterPill, dateFilter === 'week' && styles.dateFilterPillActive]}
-              onPress={async () => {
-                setDateFilter('week');
-                // Auto-scan when filter is clicked
-                await handleScan();
-              }}
-            >
-              <Text style={[styles.dateFilterPillText, dateFilter === 'week' && styles.dateFilterPillTextActive]}>
-                Week
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dateFilterPill, dateFilter === 'month' && styles.dateFilterPillActive]}
-              onPress={async () => {
-                setDateFilter('month');
-                // Auto-scan when filter is clicked
-                await handleScan();
-              }}
-            >
-              <Text style={[styles.dateFilterPillText, dateFilter === 'month' && styles.dateFilterPillTextActive]}>
-                Month
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-        </View>
-
-        {/* Card List */}
-        <View style={styles.cardsContainer}>
+    return (
+      <>
+        <View style={styles.cardStage}>
           {filteredTransactions.length === 0 ? (
             <Animated.View
               style={[
@@ -468,7 +415,6 @@ const ReviewScreen = ({ navigation }) => {
               ]}
               {...emptyStatePanResponder.panHandlers}
             >
-              {/* Star - Not swipeable, separate */}
               <Animated.View
                 style={[
                   styles.starContainer,
@@ -488,7 +434,6 @@ const ReviewScreen = ({ navigation }) => {
                 <Ionicons name="star-outline" size={72} color="#B794F6" />
               </Animated.View>
               
-              {/* Text - Not swipeable, stays with star */}
               <Animated.View
                 style={[
                   styles.emptyTextContainer,
@@ -506,7 +451,6 @@ const ReviewScreen = ({ navigation }) => {
             </Animated.View>
           ) : (
             <>
-              {/* Current Card */}
               {currentCard && (
                 <SwipeCard
                   key={currentCard.id}
@@ -521,7 +465,6 @@ const ReviewScreen = ({ navigation }) => {
             </>
           )}
           
-          {/* Eye Button - Top Right of Card Area */}
           {transactions.length > 0 && (
             <View style={styles.eyeButtonContainer}>
               <Animated.View
@@ -549,8 +492,7 @@ const ReviewScreen = ({ navigation }) => {
             </View>
           )}
           
-          {/* Completion Animation */}
-          {filteredTransactions.length === 0 && transactions.length === 0 && !loading && (
+        {filteredTransactions.length === 0 && transactions.length === 0 && !loading && (
             <Animated.View 
               style={[
                 styles.completionAnimation,
@@ -566,7 +508,6 @@ const ReviewScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Bottom Action Bar */}
         {filteredTransactions.length > 0 && showActionButtons && (
           <TouchableOpacity
             style={styles.actionBarOverlay}
@@ -623,105 +564,93 @@ const ReviewScreen = ({ navigation }) => {
           </TouchableOpacity>
         )}
 
-        {/* Bottom Info Bar */}
-        {!showActionButtons && (
-          <View style={styles.bottomInfoBar}>
-            <View style={styles.bottomInfoLeft}>
-              {filteredTransactions.length > 0 ? (
-                <Text style={styles.cardsRemainingText}>
-                  {remainingCount} {remainingCount === 1 ? 'card' : 'cards'} remaining
-                </Text>
-              ) : (
-                <Text style={styles.cardsRemainingText}>
-                  All cards processed
-                </Text>
-              )}
-            </View>
-            <View style={styles.bottomInfoRight}>
-              <TouchableOpacity
-                style={styles.summaryButton}
-                onPress={() => navigation.navigate('Summary')}
-              >
-                <Text style={styles.summaryButtonText}>Summary</Text>
-              </TouchableOpacity>
-              {filteredTransactions.length > 0 && (
-                <TouchableOpacity
-                  style={styles.starButton}
-                  onPress={() => setShowActionButtons(true)}
-                >
-                  <Ionicons name="star-outline" size={20} color="#6B7280" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
+      </>
+    );
+  };
 
-        {/* Show Prev Card Modal */}
-        <Modal
-          visible={showPrevCardModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowPrevCardModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[
-              styles.modalContent,
-              lastAction && { backgroundColor: getActionColor(lastAction.type) }
-            ]}>
-              {lastAction ? (
-                <>
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>
-                      Last Action: {getActionLabel(lastAction.type)}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.modalCloseButton}
-                      onPress={() => setShowPrevCardModal(false)}
-                    >
-                      <Text style={styles.modalCloseIcon}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.modalCardContent}>
-                    <Text style={styles.modalCardSender}>
-                      {lastAction.transaction.sender}
-                    </Text>
-                    <Text style={styles.modalCardBody}>
-                      {lastAction.transaction.body}
-                    </Text>
-                    <Text style={styles.modalCardAmount}>
-                      {formatAmount(lastAction.transaction.amount)}
-                    </Text>
-                    <Text style={styles.modalCardTime}>
-                      {new Date(lastAction.transaction.timestamp * 1000).toLocaleString()}
-                    </Text>
-                  </View>
-                </>
-              ) : (
-                <View style={styles.modalEmptyState}>
-                  <Ionicons name="archive-outline" size={64} color="#9CA3AF" />
-                  <Text style={styles.modalEmptyTitle}>Nothing to show yet</Text>
-                  <Text style={styles.modalEmptyText}>
-                    Start swiping cards to track your actions
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </Modal>
+  const bottomInfo = !showActionButtons ? (
+    <View style={styles.bottomInfoBar}>
+      <View style={styles.bottomInfoLeft}>
+        {filteredTransactions.length > 0 ? (
+          <Text style={styles.cardsRemainingText}>
+            {remainingCount} {remainingCount === 1 ? 'card' : 'cards'} remaining
+          </Text>
+        ) : (
+          <Text style={styles.cardsRemainingText}>
+            All cards processed
+          </Text>
+        )}
       </View>
-    </SafeAreaView>
+      <View style={styles.bottomInfoRight}>
+        <TouchableOpacity
+          style={styles.summaryButton}
+          onPress={() => navigation.navigate('Summary')}
+        >
+          <Text style={styles.summaryButtonText}>Summary</Text>
+        </TouchableOpacity>
+        {filteredTransactions.length > 0 && (
+          <TouchableOpacity
+            style={styles.starButton}
+            onPress={() => setShowActionButtons(true)}
+          >
+            <Ionicons name="star-outline" size={20} color="#6B7280" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  ) : null;
+
+  return (
+    <ScreenShell
+      title="Today's Inbox"
+      topSlot={(
+        <View style={styles.filterSection}>
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[styles.dateFilterPill, dateFilter === 'today' && styles.dateFilterPillActive]}
+              onPress={async () => {
+                setDateFilter('today');
+                await handleScan();
+              }}
+            >
+              <Text style={[styles.dateFilterPillText, dateFilter === 'today' && styles.dateFilterPillTextActive]}>
+                Today
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateFilterPill, dateFilter === 'week' && styles.dateFilterPillActive]}
+              onPress={async () => {
+                setDateFilter('week');
+                await handleScan();
+              }}
+            >
+              <Text style={[styles.dateFilterPillText, dateFilter === 'week' && styles.dateFilterPillTextActive]}>
+                Week
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateFilterPill, dateFilter === 'month' && styles.dateFilterPillActive]}
+              onPress={async () => {
+                setDateFilter('month');
+                await handleScan();
+              }}
+            >
+              <Text style={[styles.dateFilterPillText, dateFilter === 'month' && styles.dateFilterPillTextActive]}>
+                Month
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+        </View>
+      )}
+      bottomSlot={bottomInfo}
+    >
+      {renderContent()}
+    </ScreenShell>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
   splashContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -743,36 +672,6 @@ const styles = StyleSheet.create({
   },
   splashLoader: {
     marginTop: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#8E8E93',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  header: {
-    backgroundColor: '#8B5CF6', // Purple
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-  },
-  headerSpacer: {
-    height: Platform.OS === 'ios' ? 0 : 10,
-  },
-  headerTitle: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 1.5,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-    textTransform: 'uppercase',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    opacity: 0.9,
-    letterSpacing: 0.5,
   },
   filterSection: {
     backgroundColor: '#FFFFFF',
@@ -813,10 +712,18 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     fontWeight: '600',
   },
+  cardStage: {
+    flex: 1,
+    paddingVertical: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    width: '100%',
+  },
   eyeButtonContainer: {
     position: 'absolute',
     top: 10,
-    right: 20,
+    right: 0,
     zIndex: 1000,
     pointerEvents: 'box-none',
   },
@@ -844,12 +751,6 @@ const styles = StyleSheet.create({
   },
   eyeIconBold: {
     fontWeight: 'bold',
-  },
-  cardsContainer: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,
