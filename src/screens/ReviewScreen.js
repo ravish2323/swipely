@@ -10,7 +10,6 @@ import {
   Modal,
   PanResponder,
   Animated,
-  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SwipeCard from '../components/SwipeCard';
@@ -22,7 +21,7 @@ import {
 } from '../services/database';
 import SMSService from '../services/smsService';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ReviewScreen = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
@@ -49,51 +48,6 @@ const ReviewScreen = ({ navigation }) => {
   const starRotation = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
   const textScale = useRef(new Animated.Value(0.8)).current;
-  
-  // Swipe gesture for empty state to navigate to Summary
-  const emptyStateSwipePosition = useRef(new Animated.ValueXY()).current;
-  const emptyStatePanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dx) > 10;
-      },
-      onPanResponderGrant: () => {
-        emptyStateSwipePosition.setOffset({
-          x: emptyStateSwipePosition.x._value,
-          y: emptyStateSwipePosition.y._value,
-        });
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        emptyStateSwipePosition.setValue({ x: gestureState.dx, y: 0 });
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        emptyStateSwipePosition.flattenOffset();
-        
-        if (gestureState.dx < -100) {
-          // Swipe left - go to Summary
-          Animated.timing(emptyStateSwipePosition, {
-            toValue: { x: -SCREEN_WIDTH, y: 0 },
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            navigation.navigate('Summary');
-            setTimeout(() => {
-              emptyStateSwipePosition.setValue({ x: 0, y: 0 });
-            }, 100);
-          });
-        } else {
-          // Return to center
-          Animated.spring(emptyStateSwipePosition, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }).start();
-        }
-      },
-    })
-  ).current;
   
   useEffect(() => {
     // Check if we should show empty state
@@ -407,7 +361,12 @@ const ReviewScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <AnimatedNavigationWrapper
+        style={styles.container}
+        onSwipeLeft={() => navigation.navigate('Summary')}
+        onSwipeRight={() => navigation.navigate('Summary')}
+        edgeActivationWidth={32}
+      >
         {/* Purple Header */}
         <View style={styles.header}>
           <View style={styles.headerSpacer} />
@@ -509,7 +468,7 @@ const ReviewScreen = ({ navigation }) => {
                   You've processed all transactions for this period.
                 </Text>
               </Animated.View>
-            </Animated.View>
+            </View>
           ) : (
             <>
               {currentCard && (

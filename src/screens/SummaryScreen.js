@@ -42,63 +42,6 @@ const SummaryScreen = ({ navigation }) => {
     new Animated.Value(0),
   ]).current;
   
-  // Swipe gesture for navigation
-  const swipePosition = useRef(new Animated.ValueXY()).current;
-  
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dx) > 10;
-      },
-      onPanResponderGrant: () => {
-        swipePosition.setOffset({
-          x: swipePosition.x._value,
-          y: swipePosition.y._value,
-        });
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        swipePosition.setValue({ x: gestureState.dx, y: 0 });
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        swipePosition.flattenOffset();
-        
-        if (gestureState.dx > SWIPE_THRESHOLD) {
-          // Swipe right - go to Review page with smooth transition
-          Animated.parallel([
-            Animated.timing(swipePosition, {
-              toValue: { x: SCREEN_WIDTH, y: 0 },
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            navigation.navigate('Review');
-            // Reset position after navigation
-            setTimeout(() => {
-              swipePosition.setValue({ x: 0, y: 0 });
-            }, 100);
-          });
-        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-          // Swipe left - ignore, just return to center
-          Animated.spring(swipePosition, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }).start();
-        } else {
-          // Return to center
-          Animated.spring(swipePosition, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
   useEffect(() => {
     loadData();
   }, []);
@@ -405,6 +348,15 @@ const SummaryScreen = ({ navigation }) => {
   };
 
   return (
+    <AnimatedNavigationWrapper
+      onSwipeRight={() => navigation.navigate('Review')}
+      style={styles.container}
+    >
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
     <SafeAreaView style={styles.safeArea}>
       <Animated.View 
         style={[
@@ -586,8 +538,8 @@ const SummaryScreen = ({ navigation }) => {
           </View>
         </View>
       </ScrollView>
-      </Animated.View>
-    </SafeAreaView>
+
+    </AnimatedNavigationWrapper>
   );
 };
 
