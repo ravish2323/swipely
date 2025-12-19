@@ -3,15 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   RefreshControl,
   ActivityIndicator,
-  SafeAreaView,
+  TouchableOpacity,
   Alert,
   Animated,
   PanResponder,
   Dimensions,
+  SafeAreaView,
 } from 'react-native';
+import ScreenShell from '../components/ScreenShell';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 100;
@@ -46,63 +47,6 @@ const SummaryScreen = ({ navigation }) => {
     new Animated.Value(0),
   ]).current;
   
-  // Swipe gesture for navigation
-  const swipePosition = useRef(new Animated.ValueXY()).current;
-  
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dx) > 10;
-      },
-      onPanResponderGrant: () => {
-        swipePosition.setOffset({
-          x: swipePosition.x._value,
-          y: swipePosition.y._value,
-        });
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        swipePosition.setValue({ x: gestureState.dx, y: 0 });
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        swipePosition.flattenOffset();
-        
-        if (gestureState.dx > SWIPE_THRESHOLD) {
-          // Swipe right - go to Review page with smooth transition
-          Animated.parallel([
-            Animated.timing(swipePosition, {
-              toValue: { x: SCREEN_WIDTH, y: 0 },
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            navigation.navigate('Review');
-            // Reset position after navigation
-            setTimeout(() => {
-              swipePosition.setValue({ x: 0, y: 0 });
-            }, 100);
-          });
-        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-          // Swipe left - ignore, just return to center
-          Animated.spring(swipePosition, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }).start();
-        } else {
-          // Return to center
-          Animated.spring(swipePosition, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
   useEffect(() => {
     loadData();
   }, []);
@@ -138,7 +82,7 @@ const SummaryScreen = ({ navigation }) => {
   
   useEffect(() => {
     if (stats && !loading) {
-      // Animate cards when stats are loaded
+      // Animate cards once when stats are loaded and loading is complete
       cardAnimations.forEach((anim, index) => {
         anim.setValue(0);
         Animated.timing(anim, {
@@ -150,21 +94,6 @@ const SummaryScreen = ({ navigation }) => {
       });
     }
   }, [stats, loading]);
-  
-  useEffect(() => {
-    if (stats) {
-      // Animate cards when stats are loaded
-      cardAnimations.forEach((anim, index) => {
-        anim.setValue(0);
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 300,
-          delay: index * 100,
-          useNativeDriver: true,
-        }).start();
-      });
-    }
-  }, [stats]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -247,61 +176,238 @@ const SummaryScreen = ({ navigation }) => {
     return `₹${Math.abs(amount).toLocaleString('en-IN')}`;
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centeredContent}>
           <ActivityIndicator size="large" color="#6366F1" />
         </View>
-      </SafeAreaView>
-    );
-  }
+      );
+    }
 
-  if (!stats) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyContainer}>
+    if (!stats) {
+      return (
+        <View style={styles.centeredContent}>
           <Text style={styles.emptyText}>No data available</Text>
         </View>
-      </SafeAreaView>
+      );
+    }
+
+    return (
+      <>
+        <View style={styles.summaryGrid}>
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.confirmedCard,
+              {
+                opacity: cardAnimations[0],
+                transform: [{
+                  translateY: cardAnimations[0].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>CONFIRMED</Text>
+            <Text style={styles.summaryCardValue}>{stats.confirmed.count}</Text>
+            <Text style={styles.summaryCardAmount}>
+              {formatAmount(stats.confirmed.total)}
+            </Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.foodCard,
+              {
+                opacity: cardAnimations[1],
+                transform: [{
+                  translateY: cardAnimations[1].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>FOOD</Text>
+            <Text style={styles.summaryCardValue}>{stats.food.count}</Text>
+            <Text style={styles.summaryCardAmount}>
+              {formatAmount(stats.food.total)}
+            </Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.rejectedCard,
+              {
+                opacity: cardAnimations[2],
+                transform: [{
+                  translateY: cardAnimations[2].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>REJECTED</Text>
+            <Text style={styles.summaryCardValue}>{stats.rejected.count}</Text>
+            <Text style={styles.summaryCardSubtext}>Not tracked</Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.specialCard,
+              {
+                opacity: cardAnimations[3],
+                transform: [{
+                  translateY: cardAnimations[3].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>SPECIAL</Text>
+            <Text style={styles.summaryCardValue}>{stats.special.count}</Text>
+            <Text style={styles.summaryCardAmount}>
+              {formatAmount(stats.special.total)}
+            </Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.pendingCard,
+              {
+                opacity: cardAnimations[4],
+                transform: [{
+                  translateY: cardAnimations[4].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>PENDING</Text>
+            <Text style={styles.summaryCardValue}>{stats.pending.count}</Text>
+            <Text style={styles.summaryCardSubtext}>Awaiting review</Text>
+          </Animated.View>
+        </View>
+
+        <View style={styles.statsCard}>
+          <Text style={styles.statsCardTitle}>Statistics</Text>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Total Transactions Processed</Text>
+            <Text style={styles.statValue}>
+              {stats.confirmed.count + stats.rejected.count + stats.special.count}
+            </Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Total Amount Tracked</Text>
+            <Text style={styles.statValue}>
+              {formatAmount(stats.confirmed.total + stats.special.total)}
+            </Text>
+          </View>
+          <View style={[styles.statRow, styles.statRowLast]}>
+            <Text style={styles.statLabel}>Average Confidence</Text>
+            <Text style={styles.statValue}>
+              {stats.averageConfidence
+                ? Math.round(stats.averageConfidence * 100)
+                : 0}
+              %
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.dbCard}>
+          <Text style={styles.dbCardTitle}>Database Management</Text>
+          <Text style={styles.dbCardDescription}>
+            Manage your transaction data. Use with caution as these actions cannot be undone.
+          </Text>
+          <View style={styles.dbButtonsRow}>
+            <TouchableOpacity
+              style={[styles.dbButton, styles.clearButton]}
+              onPress={handleClearTransactions}
+            >
+              <Text style={styles.dbButtonText}>Clear Transactions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dbButton, styles.resetButton]}
+              onPress={handleResetDatabase}
+            >
+              <Text style={styles.dbButtonText}>Reset Database</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
     );
-  }
+  };
 
   return (
+    <AnimatedNavigationWrapper
+      onSwipeRight={() => navigation.navigate('Review')}
+      style={styles.container}
+    >
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
     <SafeAreaView style={styles.safeArea}>
-      <Animated.View
+      <Animated.View 
         style={[
           styles.container,
           {
             transform: [{ translateX: swipePosition.x }],
-            opacity: swipePosition.x.interpolate({
-              inputRange: [0, SCREEN_WIDTH],
-              outputRange: [1, 0],
-              extrapolate: 'clamp',
-            }),
           },
         ]}
         {...panResponder.panHandlers}
       >
-        <SummaryHeader
-          title=\"Summary\"
-          subtitle=\"Processed activity and controls\"
-          paddingHorizontal={spacing.xl}
-        />
+        {/* Purple Header */}
+        <View style={styles.header}>
+          <View style={styles.headerSpacer} />
+          <Text style={styles.headerTitle}>Summary</Text>
+        </View>
+
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
           <View style={styles.content}>
-            <SummaryGrid
-              stats={stats}
-              cardAnimations={cardAnimations}
-              formatAmount={formatAmount}
-              marginBottom={spacing.xxl}
-            />
+          {/* Summary Cards Grid */}
+          <View style={styles.summaryGrid}>
+            <Animated.View 
+              style={[
+                styles.summaryCard, 
+                styles.confirmedCard,
+                {
+                  opacity: cardAnimations[0],
+                  transform: [{
+                    translateY: cardAnimations[0].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <Text style={styles.summaryCardTitle}>CONFIRMED</Text>
+              <Text style={styles.summaryCardValue}>{stats.confirmed.count}</Text>
+              <Text style={styles.summaryCardAmount}>
+                {formatAmount(stats.confirmed.total)}
+              </Text>
+            </Animated.View>
 
             <StatsCard
               stats={stats}
@@ -317,9 +423,32 @@ const SummaryScreen = ({ navigation }) => {
               padding={spacing.xl}
             />
           </View>
-        </ScrollView>
-      </Animated.View>
-    </SafeAreaView>
+
+          {/* Database Management Card */}
+          <View style={styles.dbCard}>
+            <Text style={styles.dbCardTitle}>Database Management</Text>
+            <Text style={styles.dbCardDescription}>
+              Manage your transaction data. Use with caution as these actions cannot be undone.
+            </Text>
+            <View style={styles.dbButtonsRow}>
+              <TouchableOpacity
+                style={[styles.dbButton, styles.clearButton]}
+                onPress={handleClearTransactions}
+              >
+                <Text style={styles.dbButtonText}>Clear Transactions</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dbButton, styles.resetButton]}
+                onPress={handleResetDatabase}
+              >
+                <Text style={styles.dbButtonText}>Reset Database</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+    </AnimatedNavigationWrapper>
   );
 };
 
@@ -332,33 +461,179 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
+  header: {
+    backgroundColor: '#8B5CF6', // Purple
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+  },
+  headerSpacer: {
+    height: Platform.OS === 'ios' ? 0 : 10,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'System' : Platform.select({ android: 'Inter_600SemiBold' }) || 'sans-serif',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    opacity: 0.9,
+    letterSpacing: 0.5,
+  },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
   },
-  emptyContainer: {
+  centeredContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: spacing.xl,
   },
   emptyText: {
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xxl,
-  },
   content: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    padding: 20,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  summaryCard: {
+    width: '48%',
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  confirmedCard: {
+    backgroundColor: '#e8f7f0', // Soft mint
+  },
+  foodCard: {
+    backgroundColor: '#fff5d9', // Pale yellow
+  },
+  rejectedCard: {
+    backgroundColor: '#ffe6e6', // Pale red
+  },
+  specialCard: {
+    backgroundColor: '#edf0ff', // Pale blue-lavender
+  },
+  pendingCard: {
+    backgroundColor: '#e4f8ff', // Light cyan
+  },
+  summaryCardTitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
+  },
+  summaryCardValue: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 6,
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
+  },
+  summaryCardAmount: {
+    fontSize: 15,
+    color: '#4B5563',
+    fontWeight: '500',
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_500Medium' }) || 'sans-serif',
+  },
+  summaryCardSubtext: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
+  },
+  statsCard: {
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+  },
+  statsCardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 16,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  statRowLast: {
+    borderBottomWidth: 0,
+  },
+  statLabel: {
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
+  },
+  dbCard: {
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+  },
+  dbCardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 12,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
+  },
+  dbCardDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
+    fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
+  },
+  dbButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dbButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  clearButton: {
+    backgroundColor: '#ffe6e6', // Soft red
+  },
+  resetButton: {
+    backgroundColor: '#fff5d9', // Soft yellow
+  },
+  dbButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1A1A1A',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
   },
 });
 

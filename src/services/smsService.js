@@ -118,22 +118,28 @@ class SMSService {
         return;
       }
 
-      // Get SMS from mid-October to today (as per FE key plan change requirement)
-      // Base start date
-      const baseStartDate = new Date(2025, 9, 15); // Months are 0-based: 9 = October
+      // Rolling window: fetch SMS from 90 days ago to today
+      // This ensures we get recent messages while keeping the window manageable
+      const now = new Date();
+      const baseStartDate = new Date(now);
+      baseStartDate.setDate(now.getDate() - 90); // 90 days ago
       baseStartDate.setHours(0, 0, 0, 0);
       const baseStartTimestamp = baseStartDate.getTime();
+      const currentTimestamp = now.getTime();
 
       // Only fetch SMS newer than the last processed one to avoid re-processing
-      const effectiveStartTimestamp =
+      // Ensure minDate never exceeds current date
+      const effectiveStartTimestamp = Math.min(
         this.lastProcessedSmsDate && this.lastProcessedSmsDate > baseStartTimestamp
           ? this.lastProcessedSmsDate
-          : baseStartTimestamp;
+          : baseStartTimestamp,
+        currentTimestamp
+      );
 
       const filter = {
         box: 'inbox',
         minDate: effectiveStartTimestamp,
-        maxDate: Date.now(),
+        maxDate: currentTimestamp, // Use consistent timestamp
       };
 
       // Use promise wrapper for better async handling
