@@ -24,6 +24,11 @@ import {
   resetDatabase,
 } from '../services/database';
 import SMSService from '../services/smsService';
+import SummaryHeader from '../components/summary/SummaryHeader';
+import SummaryGrid from '../components/summary/SummaryGrid';
+import StatsCard from '../components/summary/StatsCard';
+import DatabaseCard from '../components/summary/DatabaseCard';
+import spacing from '../theme/spacing';
 
 const SummaryScreen = ({ navigation }) => {
   const [stats, setStats] = useState(null);
@@ -404,115 +409,19 @@ const SummaryScreen = ({ navigation }) => {
               </Text>
             </Animated.View>
 
-            <Animated.View 
-              style={[
-                styles.summaryCard, 
-                styles.foodCard,
-                {
-                  opacity: cardAnimations[1],
-                  transform: [{
-                    translateY: cardAnimations[1].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    }),
-                  }],
-                },
-              ]}
-            >
-              <Text style={styles.summaryCardTitle}>FOOD</Text>
-              <Text style={styles.summaryCardValue}>{stats.food.count}</Text>
-              <Text style={styles.summaryCardAmount}>
-                {formatAmount(stats.food.total)}
-              </Text>
-            </Animated.View>
+            <StatsCard
+              stats={stats}
+              formatAmount={formatAmount}
+              marginBottom={spacing.xxl}
+              padding={spacing.xl}
+            />
 
-            <Animated.View 
-              style={[
-                styles.summaryCard, 
-                styles.rejectedCard,
-                {
-                  opacity: cardAnimations[2],
-                  transform: [{
-                    translateY: cardAnimations[2].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    }),
-                  }],
-                },
-              ]}
-            >
-              <Text style={styles.summaryCardTitle}>REJECTED</Text>
-              <Text style={styles.summaryCardValue}>{stats.rejected.count}</Text>
-              <Text style={styles.summaryCardSubtext}>Not tracked</Text>
-            </Animated.View>
-
-            <Animated.View 
-              style={[
-                styles.summaryCard, 
-                styles.specialCard,
-                {
-                  opacity: cardAnimations[3],
-                  transform: [{
-                    translateY: cardAnimations[3].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    }),
-                  }],
-                },
-              ]}
-            >
-              <Text style={styles.summaryCardTitle}>SPECIAL</Text>
-              <Text style={styles.summaryCardValue}>{stats.special.count}</Text>
-              <Text style={styles.summaryCardAmount}>
-                {formatAmount(stats.special.total)}
-              </Text>
-            </Animated.View>
-
-            <Animated.View 
-              style={[
-                styles.summaryCard, 
-                styles.pendingCard,
-                {
-                  opacity: cardAnimations[4],
-                  transform: [{
-                    translateY: cardAnimations[4].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    }),
-                  }],
-                },
-              ]}
-            >
-              <Text style={styles.summaryCardTitle}>PENDING</Text>
-              <Text style={styles.summaryCardValue}>{stats.pending.count}</Text>
-              <Text style={styles.summaryCardSubtext}>Awaiting review</Text>
-            </Animated.View>
-          </View>
-
-          {/* Statistics Card */}
-          <View style={styles.statsCard}>
-            <Text style={styles.statsCardTitle}>Statistics</Text>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Total Transactions Processed</Text>
-              <Text style={styles.statValue}>
-                {stats.confirmed.count + stats.rejected.count + stats.special.count}
-              </Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Total Amount Tracked</Text>
-              <Text style={styles.statValue}>
-                {formatAmount(stats.confirmed.total + stats.special.total)}
-              </Text>
-            </View>
-            <View style={[styles.statRow, styles.statRowLast]}>
-              <Text style={styles.statLabel}>Average Confidence</Text>
-              <Text style={styles.statValue}>
-                {stats.averageConfidence
-                  ? Math.round(stats.averageConfidence * 100)
-                  : 0}
-                %
-              </Text>
-            </View>
+            <DatabaseCard
+              onClear={handleClearTransactions}
+              onReset={handleResetDatabase}
+              marginBottom={spacing.xxl}
+              padding={spacing.xl}
+            />
           </View>
 
           {/* Database Management Card */}
@@ -586,6 +495,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#6B7280',
+    textAlign: 'center',
   },
   content: {
     padding: 20,

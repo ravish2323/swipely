@@ -20,6 +20,7 @@ import {
   updateTransactionCategory,
 } from '../services/database';
 import SMSService from '../services/smsService';
+import spacing from '../theme/spacing';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -715,12 +716,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   splashTitle: {
-    marginTop: 24,
+    marginTop: spacing.xxl,
     fontSize: 24,
     fontWeight: '700',
     color: '#1F2937',
     textAlign: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: spacing.xl * 2,
     letterSpacing: -0.5,
     fontFamily: Platform.select({ ios: 'System', android: 'Inter_700Bold' }) || 'sans-serif',
   },
@@ -970,13 +971,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.xl,
   },
   modalContent: {
-    width: SCREEN_WIDTH - 40,
+    width: SCREEN_WIDTH - spacing.xl * 2,
     maxHeight: '70%',
     borderRadius: 24,
     backgroundColor: '#FFFFFF',
-    padding: 24,
+    padding: spacing.xl + spacing.sm,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -990,7 +992,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   modalTitle: {
     fontSize: 20,
@@ -1013,25 +1015,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalCardContent: {
-    paddingTop: 12,
+    paddingTop: spacing.md,
   },
   modalCardSender: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   modalCardBody: {
     fontSize: 15,
     color: '#6B7280',
     lineHeight: 22,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   modalCardAmount: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   modalCardTime: {
     fontSize: 13,
@@ -1040,13 +1042,13 @@ const styles = StyleSheet.create({
   },
   modalEmptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: spacing.xxl,
   },
   modalEmptyTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   modalEmptyText: {
     fontSize: 14,
