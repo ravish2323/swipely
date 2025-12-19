@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "SpendSwipe",
+    "slug": "spendswipe",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#6200EE",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6200EE"
+      },
+      "permissions": [
+        "READ_SMS",
+        "RECEIVE_SMS"
+      ],
+      "package": "com.spendswipe.app"
+    },
+    "web": {},
+    "sdkVersion": "54.0.0",
+    "plugins": [
+      "expo-sqlite",
+      "./app.plugin.js"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "31a9520f-0f5a-456e-bab2-8a11d8604c73"
+      }
+    }
+  }
+}
