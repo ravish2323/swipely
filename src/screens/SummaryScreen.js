@@ -3,20 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
-  Modal,
   Alert,
-  Platform,
   Animated,
   PanResponder,
   Dimensions,
   SafeAreaView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import AnimatedNavigationWrapper from '../components/AnimatedNavigationWrapper';
+import ScreenShell from '../components/ScreenShell';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SWIPE_THRESHOLD = 100;
 import {
   getSummaryStats,
   getTransactionsByStatus,
@@ -172,21 +171,181 @@ const SummaryScreen = ({ navigation }) => {
     return `₹${Math.abs(amount).toLocaleString('en-IN')}`;
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
-      </View>
-    );
-  }
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centeredContent}>
+          <ActivityIndicator size="large" color="#6366F1" />
+        </View>
+      );
+    }
 
-  if (!stats) {
+    if (!stats) {
+      return (
+        <View style={styles.centeredContent}>
+          <Text style={styles.emptyText}>No data available</Text>
+        </View>
+      );
+    }
+
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No data available</Text>
-      </View>
+      <>
+        <View style={styles.summaryGrid}>
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.confirmedCard,
+              {
+                opacity: cardAnimations[0],
+                transform: [{
+                  translateY: cardAnimations[0].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>CONFIRMED</Text>
+            <Text style={styles.summaryCardValue}>{stats.confirmed.count}</Text>
+            <Text style={styles.summaryCardAmount}>
+              {formatAmount(stats.confirmed.total)}
+            </Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.foodCard,
+              {
+                opacity: cardAnimations[1],
+                transform: [{
+                  translateY: cardAnimations[1].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>FOOD</Text>
+            <Text style={styles.summaryCardValue}>{stats.food.count}</Text>
+            <Text style={styles.summaryCardAmount}>
+              {formatAmount(stats.food.total)}
+            </Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.rejectedCard,
+              {
+                opacity: cardAnimations[2],
+                transform: [{
+                  translateY: cardAnimations[2].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>REJECTED</Text>
+            <Text style={styles.summaryCardValue}>{stats.rejected.count}</Text>
+            <Text style={styles.summaryCardSubtext}>Not tracked</Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.specialCard,
+              {
+                opacity: cardAnimations[3],
+                transform: [{
+                  translateY: cardAnimations[3].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>SPECIAL</Text>
+            <Text style={styles.summaryCardValue}>{stats.special.count}</Text>
+            <Text style={styles.summaryCardAmount}>
+              {formatAmount(stats.special.total)}
+            </Text>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.summaryCard, 
+              styles.pendingCard,
+              {
+                opacity: cardAnimations[4],
+                transform: [{
+                  translateY: cardAnimations[4].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCardTitle}>PENDING</Text>
+            <Text style={styles.summaryCardValue}>{stats.pending.count}</Text>
+            <Text style={styles.summaryCardSubtext}>Awaiting review</Text>
+          </Animated.View>
+        </View>
+
+        <View style={styles.statsCard}>
+          <Text style={styles.statsCardTitle}>Statistics</Text>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Total Transactions Processed</Text>
+            <Text style={styles.statValue}>
+              {stats.confirmed.count + stats.rejected.count + stats.special.count}
+            </Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Total Amount Tracked</Text>
+            <Text style={styles.statValue}>
+              {formatAmount(stats.confirmed.total + stats.special.total)}
+            </Text>
+          </View>
+          <View style={[styles.statRow, styles.statRowLast]}>
+            <Text style={styles.statLabel}>Average Confidence</Text>
+            <Text style={styles.statValue}>
+              {stats.averageConfidence
+                ? Math.round(stats.averageConfidence * 100)
+                : 0}
+              %
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.dbCard}>
+          <Text style={styles.dbCardTitle}>Database Management</Text>
+          <Text style={styles.dbCardDescription}>
+            Manage your transaction data. Use with caution as these actions cannot be undone.
+          </Text>
+          <View style={styles.dbButtonsRow}>
+            <TouchableOpacity
+              style={[styles.dbButton, styles.clearButton]}
+              onPress={handleClearTransactions}
+            >
+              <Text style={styles.dbButtonText}>Clear Transactions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dbButton, styles.resetButton]}
+              onPress={handleResetDatabase}
+            >
+              <Text style={styles.dbButtonText}>Reset Database</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
     );
-  }
+  };
 
   return (
     <AnimatedNavigationWrapper
@@ -418,22 +577,15 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
   },
-  emptyContainer: {
+  centeredContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
   },
   emptyText: {
     fontSize: 16,
     color: '#6B7280',
-  },
-  scrollView: {
-    flex: 1,
   },
   content: {
     padding: 20,
