@@ -93,12 +93,20 @@ export default function App() {
         <Stack.Screen
           name="Review"
           component={ReviewScreen}
-          options={{ title: "Today's Inbox" }}
+          options={{ 
+            headerShown: false,
+          }}
         />
         <Stack.Screen
           name="Summary"
           component={SummaryScreen}
-          options={{ title: 'Summary' }}
+          options={{ 
+            title: 'Summary',
+            headerStyle: {
+              backgroundColor: '#8B5CF6',
+            },
+            headerTintColor: '#fff',
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>

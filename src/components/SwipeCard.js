@@ -6,18 +6,30 @@ import {
   PanResponder,
   Animated,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 120;
 
-const SwipeCard = ({ transaction, onSwipe, index, showAmount = true }) => {
+const SwipeCard = ({ 
+  transaction, 
+  onSwipe, 
+  index, 
+  showAmount = true,
+  showActionButtons = false,
+  onToggleActionButtons = null,
+}) => {
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = position.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
     outputRange: ['-8deg', '0deg', '8deg'],
     extrapolate: 'clamp',
   });
+  
+  // Animated background color
+  const bgColor = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -28,25 +40,54 @@ const SwipeCard = ({ transaction, onSwipe, index, showAmount = true }) => {
           x: position.x._value,
           y: position.y._value,
         });
+        bgColor.setValue(0); // Reset color on new gesture
       },
       onPanResponderMove: (evt, gestureState) => {
         position.setValue({ x: gestureState.dx, y: gestureState.dy });
+        
+        // Update background color based on swipe direction
+        const { dx, dy } = gestureState;
+        if (Math.abs(dy) > Math.abs(dx)) {
+          if (dy < -50) {
+            bgColor.setValue(1); // Blue (up)
+          } else if (dy > 50) {
+            bgColor.setValue(2); // Yellow (down)
+          } else {
+            bgColor.setValue(0); // White
+          }
+        } else {
+          if (dx > 50) {
+            bgColor.setValue(3); // Green (right)
+          } else if (dx < -50) {
+            bgColor.setValue(4); // Red (left)
+          } else {
+            bgColor.setValue(0); // White
+          }
+        }
       },
       onPanResponderRelease: (evt, gestureState) => {
         position.flattenOffset();
         
         const swipeDirection = getSwipeDirection(gestureState);
+        const velocity = Math.sqrt(gestureState.vx * gestureState.vx + gestureState.vy * gestureState.vy);
         
         if (swipeDirection) {
-          handleSwipe(swipeDirection);
+          handleSwipe(swipeDirection, velocity);
         } else {
-          // Return to center
-          Animated.spring(position, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: false,
-            tension: 50,
-            friction: 7,
-          }).start();
+          // Return to center with velocity-based animation
+          const returnDuration = Math.min(300, Math.max(150, 300 - velocity * 10));
+          Animated.parallel([
+            Animated.timing(position, {
+              toValue: { x: 0, y: 0 },
+              duration: returnDuration,
+              useNativeDriver: false,
+            }),
+            Animated.timing(bgColor, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: false,
+            }),
+          ]).start();
         }
       },
     })
@@ -55,52 +96,68 @@ const SwipeCard = ({ transaction, onSwipe, index, showAmount = true }) => {
   const getSwipeDirection = (gestureState) => {
     const { dx, dy } = gestureState;
     
-    if (Math.abs(dy) > Math.abs(dx) && dy < -SWIPE_THRESHOLD) {
-      return 'up'; // Swipe up (special)
-    } else if (Math.abs(dy) > Math.abs(dx) && dy > SWIPE_THRESHOLD) {
-      return 'down'; // Swipe down (categorize as food)
-    } else if (dx > SWIPE_THRESHOLD) {
-      return 'right'; // Swipe right
-    } else if (dx < -SWIPE_THRESHOLD) {
-      return 'left'; // Swipe left
+    // Check vertical swipes first (up/down)
+    if (Math.abs(dy) > Math.abs(dx)) {
+      if (dy < -SWIPE_THRESHOLD) {
+        return 'up'; // Swipe up (favorite/special)
+      } else if (dy > SWIPE_THRESHOLD) {
+        return 'down'; // Swipe down (food)
+      }
+    } else {
+      // Horizontal swipes
+      if (dx > SWIPE_THRESHOLD) {
+        return 'right'; // Swipe right (confirm)
+      } else if (dx < -SWIPE_THRESHOLD) {
+        return 'left'; // Swipe left (reject)
+      }
     }
     return null;
   };
 
-  const handleSwipe = (direction) => {
+  const handleSwipe = (direction, velocity = 0) => {
     let toValue;
     let status;
     let category = null;
+    let actionType = null;
     
     switch (direction) {
       case 'right':
         toValue = { x: SCREEN_WIDTH + 100, y: 0 };
         status = 'confirmed';
+        actionType = 'confirm';
         break;
       case 'left':
         toValue = { x: -SCREEN_WIDTH - 100, y: 0 };
         status = 'rejected';
+        actionType = 'reject';
         break;
       case 'up':
         toValue = { x: 0, y: -SCREEN_HEIGHT - 100 };
         status = 'special';
+        actionType = 'favorite';
         break;
       case 'down':
         toValue = { x: 0, y: SCREEN_HEIGHT + 100 };
         status = 'confirmed';
         category = 'food';
+        actionType = 'food';
         break;
       default:
         return;
     }
 
+    // Use velocity to determine animation speed - faster swipe = faster animation
+    const baseDuration = 200;
+    const velocityFactor = Math.min(1, Math.max(0.4, 1 - Math.abs(velocity) * 0.15));
+    const duration = Math.max(120, Math.min(300, baseDuration * velocityFactor));
+
     Animated.timing(position, {
       toValue,
-      duration: 250,
+      duration,
       useNativeDriver: false,
     }).start(() => {
       if (onSwipe) {
-        onSwipe(transaction.id, status, category);
+        onSwipe(transaction.id, status, category, actionType);
       }
     });
   };
@@ -126,22 +183,6 @@ const SwipeCard = ({ transaction, onSwipe, index, showAmount = true }) => {
     };
   };
 
-  const getBackgroundColor = () => {
-    const x = position.x._value;
-    const y = position.y._value;
-    
-    if (Math.abs(y) > Math.abs(x) && y < -50) {
-      return '#E3F2FD'; // Light blue for up
-    } else if (Math.abs(y) > Math.abs(x) && y > 50) {
-      return '#FFF3E0'; // Light orange for down (Food)
-    } else if (x > 50) {
-      return '#E8F5E9'; // Light green for right
-    } else if (x < -50) {
-      return '#FFEBEE'; // Light red for left
-    }
-    return '#FFFFFF';
-  };
-
   const formatAmount = (amount) => {
     if (!amount) return '—';
     const absAmount = Math.abs(amount);
@@ -149,9 +190,17 @@ const SwipeCard = ({ transaction, onSwipe, index, showAmount = true }) => {
     return `${sign}₹${absAmount.toLocaleString('en-IN')}`;
   };
 
-  const backgroundColor = position.x._value || position.y._value 
-    ? getBackgroundColor() 
-    : '#FFFFFF';
+  // Animated background color interpolation
+  const backgroundColor = bgColor.interpolate({
+    inputRange: [0, 1, 2, 3, 4],
+    outputRange: [
+      '#FFFFFF', // White (default)
+      '#edf0ff', // Soft blue (up/favorite)
+      '#fff5d9', // Soft yellow (down/food)
+      '#e8f7f0', // Soft green (right/confirm)
+      '#ffe6e6', // Soft red (left/reject)
+    ],
+  });
 
   return (
     <Animated.View
@@ -159,7 +208,7 @@ const SwipeCard = ({ transaction, onSwipe, index, showAmount = true }) => {
       {...panResponder.panHandlers}
     >
       <View style={styles.cardContent}>
-        {/* Header */}
+        {/* Header with Star Toggle */}
         <View style={styles.header}>
           <View style={styles.senderContainer}>
             <Text style={styles.sender} numberOfLines={1}>
@@ -174,10 +223,12 @@ const SwipeCard = ({ transaction, onSwipe, index, showAmount = true }) => {
               })}
             </Text>
           </View>
-          <View style={styles.confidenceBadge}>
-            <Text style={styles.confidenceText}>
-              {Math.round(transaction.confidence * 100)}%
-            </Text>
+          <View style={styles.headerRight}>
+            <View style={styles.confidenceBadge}>
+              <Text style={styles.confidenceText}>
+                {Math.round(transaction.confidence * 100)}%
+              </Text>
+            </View>
           </View>
         </View>
         
@@ -234,19 +285,23 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   sender: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 4,
-    letterSpacing: -0.3,
   },
   timestamp: {
     fontSize: 13,
     color: '#8E8E93',
-    fontWeight: '500',
+    fontWeight: '400',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   confidenceBadge: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#8B5CF6',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
@@ -254,8 +309,7 @@ const styles = StyleSheet.create({
   confidenceText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
   bodyContainer: {
     flex: 1,
@@ -265,8 +319,8 @@ const styles = StyleSheet.create({
   bodyText: {
     fontSize: 16,
     color: '#3A3A3A',
-    lineHeight: 24,
-    letterSpacing: -0.2,
+    lineHeight: 22,
+    fontWeight: '400',
   },
   amountContainer: {
     paddingTop: 16,
@@ -274,10 +328,9 @@ const styles = StyleSheet.create({
     borderTopColor: '#F0F0F0',
   },
   amountValue: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '600',
     color: '#1A1A1A',
-    letterSpacing: -0.5,
   },
 });
 
