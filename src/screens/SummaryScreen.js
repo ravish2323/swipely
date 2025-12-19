@@ -11,13 +11,9 @@ import {
   Alert,
   Platform,
   Animated,
-  PanResponder,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = 100;
+import AnimatedNavigationWrapper from '../components/AnimatedNavigationWrapper';
 import {
   getSummaryStats,
   getTransactionsByStatus,
@@ -44,63 +40,6 @@ const SummaryScreen = ({ navigation }) => {
     new Animated.Value(0),
   ]).current;
   
-  // Swipe gesture for navigation
-  const swipePosition = useRef(new Animated.ValueXY()).current;
-  
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dx) > 10;
-      },
-      onPanResponderGrant: () => {
-        swipePosition.setOffset({
-          x: swipePosition.x._value,
-          y: swipePosition.y._value,
-        });
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        swipePosition.setValue({ x: gestureState.dx, y: 0 });
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        swipePosition.flattenOffset();
-        
-        if (gestureState.dx > SWIPE_THRESHOLD) {
-          // Swipe right - go to Review page with smooth transition
-          Animated.parallel([
-            Animated.timing(swipePosition, {
-              toValue: { x: SCREEN_WIDTH, y: 0 },
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            navigation.navigate('Review');
-            // Reset position after navigation
-            setTimeout(() => {
-              swipePosition.setValue({ x: 0, y: 0 });
-            }, 100);
-          });
-        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-          // Swipe left - ignore, just return to center
-          Animated.spring(swipePosition, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }).start();
-        } else {
-          // Return to center
-          Animated.spring(swipePosition, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
   useEffect(() => {
     loadData();
   }, []);
@@ -262,19 +201,9 @@ const SummaryScreen = ({ navigation }) => {
   }
 
   return (
-    <Animated.View 
-      style={[
-        styles.container,
-        {
-          transform: [{ translateX: swipePosition.x }],
-          opacity: swipePosition.x.interpolate({
-            inputRange: [0, SCREEN_WIDTH],
-            outputRange: [1, 0],
-            extrapolate: 'clamp',
-          }),
-        },
-      ]}
-      {...panResponder.panHandlers}
+    <AnimatedNavigationWrapper
+      onSwipeRight={() => navigation.navigate('Review')}
+      style={styles.container}
     >
       <ScrollView
         style={styles.scrollView}
@@ -442,7 +371,7 @@ const SummaryScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-    </Animated.View>
+    </AnimatedNavigationWrapper>
   );
 };
 
