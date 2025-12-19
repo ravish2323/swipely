@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, Platform, Animated } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -27,6 +27,10 @@ export default function App() {
   const [dbInitialized, setDbInitialized] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Pulsing animation for bolt
+  const boltScale = useRef(new Animated.Value(1)).current;
+  const boltOpacity = useRef(new Animated.Value(1)).current;
   
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -73,11 +77,54 @@ export default function App() {
     }
   }, [fontsLoaded]);
 
+  useEffect(() => {
+    if (!fontsLoaded || initializing || !dbInitialized) {
+      // Pulsing animation for bolt
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(boltScale, {
+              toValue: 1.2,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+            Animated.timing(boltOpacity, {
+              toValue: 0.6,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.parallel([
+            Animated.timing(boltScale, {
+              toValue: 1,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+            Animated.timing(boltOpacity, {
+              toValue: 1,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      );
+      pulseAnimation.start();
+      return () => pulseAnimation.stop();
+    }
+  }, [fontsLoaded, initializing, dbInitialized, boltScale, boltOpacity]);
+
   if (!fontsLoaded || initializing || !dbInitialized) {
     return (
       <View style={styles.splashContainer}>
         <View style={styles.splashContent}>
-          <Ionicons name="flash" size={64} color="#8B5CF6" />
+          <Animated.View
+            style={{
+              transform: [{ scale: boltScale }],
+              opacity: boltOpacity,
+            }}
+          >
+            <Ionicons name="flash" size={64} color="#8B5CF6" />
+          </Animated.View>
           <Text style={styles.splashTitle}>Swipe your expenses into control</Text>
           {error && (
             <View style={styles.errorContainer}>

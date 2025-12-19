@@ -254,11 +254,6 @@ const SummaryScreen = ({ navigation }) => {
           styles.container,
           {
             transform: [{ translateX: swipePosition.x }],
-            opacity: swipePosition.x.interpolate({
-              inputRange: [0, SCREEN_WIDTH],
-              outputRange: [1, 0],
-              extrapolate: 'clamp',
-            }),
           },
         ]}
         {...panResponder.panHandlers}
