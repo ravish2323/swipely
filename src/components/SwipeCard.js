@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -289,11 +290,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 4,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   timestamp: {
     fontSize: 13,
     color: '#8E8E93',
     fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   headerRight: {
     flexDirection: 'row',
@@ -310,6 +313,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
   },
   bodyContainer: {
     flex: 1,
@@ -321,6 +325,7 @@ const styles = StyleSheet.create({
     color: '#3A3A3A',
     lineHeight: 22,
     fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   amountContainer: {
     paddingTop: 16,
@@ -331,6 +336,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '600',
     color: '#1A1A1A',
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
   },
 });
 

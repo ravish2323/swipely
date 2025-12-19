@@ -249,11 +249,13 @@ const ReviewScreen = ({ navigation }) => {
       await SMSService.initialize();
       if (SMSService.hasPermission && SMSService.loadRecentSMS) {
         await SMSService.loadRecentSMS();
+        Alert.alert('Success', 'SMS scanning completed!');
+        setTimeout(() => {
+          loadTransactions(false);
+        }, 1000);
+      } else {
+        Alert.alert('Permission Required', 'Please grant SMS permission to scan for transactions.');
       }
-      Alert.alert('Success', 'SMS scanning completed!');
-      setTimeout(() => {
-        loadTransactions(false);
-      }, 1000);
     } catch (error) {
       console.error('Error scanning SMS:', error);
       Alert.alert('Error', 'Failed to scan SMS: ' + (error.message || 'Unknown error'));
@@ -349,7 +351,6 @@ const ReviewScreen = ({ navigation }) => {
           <View style={styles.splashContent}>
             <Ionicons name="flash" size={64} color="#8B5CF6" />
             <Text style={styles.splashTitle}>Swipe your expenses into control</Text>
-            <ActivityIndicator size="small" color="#8B5CF6" style={styles.splashLoader} />
           </View>
         </View>
       </SafeAreaView>
@@ -370,7 +371,7 @@ const ReviewScreen = ({ navigation }) => {
         {/* Purple Header */}
         <View style={styles.header}>
           <View style={styles.headerSpacer} />
-          <Text style={styles.headerTitle}>Today's Inbox</Text>
+          <Text style={styles.headerTitle}>Review</Text>
         </View>
 
         {/* Filter Row (White Background) */}
@@ -378,10 +379,8 @@ const ReviewScreen = ({ navigation }) => {
           <View style={styles.filterRow}>
             <TouchableOpacity
               style={[styles.dateFilterPill, dateFilter === 'today' && styles.dateFilterPillActive]}
-              onPress={async () => {
+              onPress={() => {
                 setDateFilter('today');
-                // Auto-scan when filter is clicked
-                await handleScan();
               }}
             >
               <Text style={[styles.dateFilterPillText, dateFilter === 'today' && styles.dateFilterPillTextActive]}>
@@ -390,10 +389,8 @@ const ReviewScreen = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.dateFilterPill, dateFilter === 'week' && styles.dateFilterPillActive]}
-              onPress={async () => {
+              onPress={() => {
                 setDateFilter('week');
-                // Auto-scan when filter is clicked
-                await handleScan();
               }}
             >
               <Text style={[styles.dateFilterPillText, dateFilter === 'week' && styles.dateFilterPillTextActive]}>
@@ -402,14 +399,24 @@ const ReviewScreen = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.dateFilterPill, dateFilter === 'month' && styles.dateFilterPillActive]}
-              onPress={async () => {
+              onPress={() => {
                 setDateFilter('month');
-                // Auto-scan when filter is clicked
-                await handleScan();
               }}
             >
               <Text style={[styles.dateFilterPillText, dateFilter === 'month' && styles.dateFilterPillTextActive]}>
                 Month
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateFilterPill, dateFilter === 'all' && styles.dateFilterPillActive]}
+              onPress={async () => {
+                setDateFilter('all');
+                // Auto-scan when filter is clicked
+                await handleScan();
+              }}
+            >
+              <Text style={[styles.dateFilterPillText, dateFilter === 'all' && styles.dateFilterPillTextActive]}>
+                All
               </Text>
             </TouchableOpacity>
           </View>
@@ -583,6 +590,10 @@ const ReviewScreen = ({ navigation }) => {
                 <Text style={styles.cardsRemainingText}>
                   {remainingCount} {remainingCount === 1 ? 'card' : 'cards'} remaining
                 </Text>
+              ) : transactions.length > 0 ? (
+                <Text style={styles.cardsRemainingText}>
+                  No cards in this filter
+                </Text>
               ) : (
                 <Text style={styles.cardsRemainingText}>
                   All cards processed
@@ -692,6 +703,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 40,
     letterSpacing: -0.5,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_700Bold' }) || 'sans-serif',
   },
   splashLoader: {
     marginTop: 32,
@@ -712,12 +724,11 @@ const styles = StyleSheet.create({
     height: Platform.OS === 'ios' ? 0 : 10,
   },
   headerTitle: {
-    fontSize: 36,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '600',
     color: '#FFFFFF',
-    letterSpacing: 1.5,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'System' : Platform.select({ android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   headerSubtitle: {
     fontSize: 14,
@@ -760,10 +771,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#6B7280',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
   },
   dateFilterPillTextActive: {
     color: '#8B5CF6',
     fontWeight: '600',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   eyeButtonContainer: {
     position: 'absolute',
@@ -826,6 +839,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
     textAlign: 'center',
     marginBottom: 12,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Inter_700Bold',
   },
   emptyText: {
     fontSize: 16,
@@ -833,6 +847,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 40,
     lineHeight: 24,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   actionBarOverlay: {
     position: 'absolute',
@@ -902,6 +917,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
   },
   summaryButton: {
     paddingHorizontal: 24,
@@ -916,6 +932,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#8B5CF6',
     letterSpacing: 0.3,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   starButton: {
     width: 40,
@@ -959,6 +976,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A1A1A',
     flex: 1,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Inter_700Bold',
   },
   modalCloseButton: {
     width: 32,
@@ -997,6 +1015,7 @@ const styles = StyleSheet.create({
   modalCardTime: {
     fontSize: 13,
     color: '#9CA3AF',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   modalEmptyState: {
     alignItems: 'center',

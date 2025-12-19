@@ -11,6 +11,9 @@ import {
   Alert,
   Platform,
   Animated,
+  PanResponder,
+  Dimensions,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedNavigationWrapper from '../components/AnimatedNavigationWrapper';
@@ -75,7 +78,7 @@ const SummaryScreen = ({ navigation }) => {
   
   useEffect(() => {
     if (stats && !loading) {
-      // Animate cards when stats are loaded
+      // Animate cards once when stats are loaded and loading is complete
       cardAnimations.forEach((anim, index) => {
         anim.setValue(0);
         Animated.timing(anim, {
@@ -87,21 +90,6 @@ const SummaryScreen = ({ navigation }) => {
       });
     }
   }, [stats, loading]);
-  
-  useEffect(() => {
-    if (stats) {
-      // Animate cards when stats are loaded
-      cardAnimations.forEach((anim, index) => {
-        anim.setValue(0);
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 300,
-          delay: index * 100,
-          useNativeDriver: true,
-        }).start();
-      });
-    }
-  }, [stats]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -210,8 +198,29 @@ const SummaryScreen = ({ navigation }) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+    <SafeAreaView style={styles.safeArea}>
+      <Animated.View 
+        style={[
+          styles.container,
+          {
+            transform: [{ translateX: swipePosition.x }],
+          },
+        ]}
+        {...panResponder.panHandlers}
       >
-        <View style={styles.content}>
+        {/* Purple Header */}
+        <View style={styles.header}>
+          <View style={styles.headerSpacer} />
+          <Text style={styles.headerTitle}>Summary</Text>
+        </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View style={styles.content}>
           {/* Summary Cards Grid */}
           <View style={styles.summaryGrid}>
             <Animated.View 
@@ -376,23 +385,29 @@ const SummaryScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#8B5CF6', // Purple
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 20,
+    paddingBottom: 16,
     paddingHorizontal: 20,
   },
+  headerSpacer: {
+    height: Platform.OS === 'ios' ? 0 : 10,
+  },
   headerTitle: {
-    fontSize: 36,
-    fontWeight: '300',
+    fontSize: 32,
+    fontWeight: '600',
     color: '#FFFFFF',
-    letterSpacing: 1.5,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-light',
-    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'System' : Platform.select({ android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   headerSubtitle: {
     fontSize: 14,
@@ -456,22 +471,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '500',
     textTransform: 'uppercase',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
   },
   summaryCardValue: {
     fontSize: 32,
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 6,
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
   },
   summaryCardAmount: {
     fontSize: 15,
     color: '#4B5563',
     fontWeight: '500',
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_500Medium' }) || 'sans-serif',
   },
   summaryCardSubtext: {
     fontSize: 13,
     color: '#9CA3AF',
     fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   statsCard: {
     marginBottom: 24,
@@ -484,6 +503,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 16,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   statRow: {
     flexDirection: 'row',
@@ -500,11 +520,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#6B7280',
     fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   statValue: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1A1A1A',
+    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
   },
   dbCard: {
     marginBottom: 24,
@@ -517,6 +539,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 12,
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   dbCardDescription: {
     fontSize: 14,
@@ -524,6 +547,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 20,
     fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   dbButtonsRow: {
     flexDirection: 'row',
@@ -547,6 +571,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#1A1A1A',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
   },
 });
 
