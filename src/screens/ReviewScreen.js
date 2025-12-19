@@ -8,21 +8,23 @@ import {
   Alert,
   Dimensions,
   SafeAreaView,
-  ScrollView,
   Modal,
-  Platform,
   PanResponder,
   Animated,
-  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SwipeCard from '../components/SwipeCard';
+import ReviewHeader from '../components/review/ReviewHeader';
+import FilterBar from '../components/review/FilterBar';
+import CardStage from '../components/review/CardStage';
+import BottomBar from '../components/review/BottomBar';
 import {
   getPendingTransactions,
   updateTransactionStatus,
   updateTransactionCategory,
 } from '../services/database';
 import SMSService from '../services/smsService';
+import spacing from '../theme/spacing';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -407,254 +409,71 @@ const ReviewScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Purple Header */}
-        <View style={styles.header}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.headerTitle}>Today's Inbox</Text>
-        </View>
+        <ReviewHeader title=\"Today's Inbox\" paddingHorizontal={spacing.xl} />
 
-        {/* Filter Row (White Background) */}
-        <View style={styles.filterSection}>
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.dateFilterPill, dateFilter === 'today' && styles.dateFilterPillActive]}
-              onPress={async () => {
-                setDateFilter('today');
-                // Auto-scan when filter is clicked
-                await handleScan();
-              }}
-            >
-              <Text style={[styles.dateFilterPillText, dateFilter === 'today' && styles.dateFilterPillTextActive]}>
-                Today
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dateFilterPill, dateFilter === 'week' && styles.dateFilterPillActive]}
-              onPress={async () => {
-                setDateFilter('week');
-                // Auto-scan when filter is clicked
-                await handleScan();
-              }}
-            >
-              <Text style={[styles.dateFilterPillText, dateFilter === 'week' && styles.dateFilterPillTextActive]}>
-                Week
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dateFilterPill, dateFilter === 'month' && styles.dateFilterPillActive]}
-              onPress={async () => {
-                setDateFilter('month');
-                // Auto-scan when filter is clicked
-                await handleScan();
-              }}
-            >
-              <Text style={[styles.dateFilterPillText, dateFilter === 'month' && styles.dateFilterPillTextActive]}>
-                Month
-              </Text>
-            </TouchableOpacity>
-          </View>
+        <FilterBar
+          activeFilter={dateFilter}
+          onFilterChange={setDateFilter}
+          onScan={handleScan}
+          paddingHorizontal={spacing.xl}
+        />
 
-        </View>
-
-        {/* Card List */}
-        <View style={styles.cardsContainer}>
-          {filteredTransactions.length === 0 ? (
-            <Animated.View
-              style={[
-                styles.emptyContainer,
-                {
-                  transform: [{ translateX: emptyStateSwipePosition.x }],
-                },
-              ]}
-              {...emptyStatePanResponder.panHandlers}
-            >
-              {/* Star - Not swipeable, separate */}
-              <Animated.View
-                style={[
-                  styles.starContainer,
-                  {
-                    transform: [
-                      { scale: starScale },
-                      { 
-                        rotate: starRotation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['0deg', '360deg'],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Ionicons name="star-outline" size={72} color="#B794F6" />
-              </Animated.View>
-              
-              {/* Text - Not swipeable, stays with star */}
-              <Animated.View
-                style={[
-                  styles.emptyTextContainer,
-                  {
-                    opacity: textOpacity,
-                    transform: [{ scale: textScale }],
-                  },
-                ]}
-              >
-                <Text style={styles.emptyTitle}>All Done!</Text>
-                <Text style={styles.emptyText}>
-                  You've processed all transactions for this period.
-                </Text>
-              </Animated.View>
-            </Animated.View>
-          ) : (
-            <>
-              {/* Current Card */}
-              {currentCard && (
-                <SwipeCard
-                  key={currentCard.id}
-                  transaction={currentCard}
-                  onSwipe={handleSwipe}
-                  index={0}
-                  showAmount={true}
-                  showActionButtons={showActionButtons}
-                  onToggleActionButtons={() => setShowActionButtons(!showActionButtons)}
-                />
-              )}
-            </>
+        <CardStage
+          filteredTransactions={filteredTransactions}
+          transactionsLength={transactions.length}
+          emptyStatePanHandlers={emptyStatePanResponder.panHandlers}
+          emptyStateSwipeStyle={{ transform: [{ translateX: emptyStateSwipePosition.x }] }}
+          starAnimatedStyle={{ transform: [{ scale: starScale }, { rotate: starRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}
+          emptyTextAnimatedStyle={{ opacity: textOpacity, transform: [{ scale: textScale }] }}
+          completionAnimatedStyle={{ opacity: completionOpacity, transform: [{ scale: completionScale }] }}
+          eyeButtonPanHandlers={eyeButtonPanResponder.panHandlers}
+          eyeButtonStyle={{ transform: [{ translateX: eyeButtonPosition.x }, { translateY: eyeButtonPosition.y }] }}
+          onEyePressIn={handleEyeButtonPressIn}
+          onEyePressOut={handleEyeButtonPressOut}
+          showCompletion={!loading}
+          paddingHorizontal={spacing.xl}
+          paddingVertical={spacing.xl}
+          renderCard={() => (
+            currentCard ? (
+              <SwipeCard
+                key={currentCard.id}
+                transaction={currentCard}
+                onSwipe={handleSwipe}
+                index={0}
+                showAmount={true}
+                showActionButtons={showActionButtons}
+                onToggleActionButtons={() => setShowActionButtons(!showActionButtons)}
+              />
+            ) : null
           )}
-          
-          {/* Eye Button - Top Right of Card Area */}
-          {transactions.length > 0 && (
-            <View style={styles.eyeButtonContainer}>
-              <Animated.View
-                style={[
-                  styles.draggableEyeButton,
-                  {
-                    transform: [
-                      { translateX: eyeButtonPosition.x },
-                      { translateY: eyeButtonPosition.y },
-                    ],
-                  },
-                ]}
-                {...eyeButtonPanResponder.panHandlers}
-              >
-              <TouchableOpacity
-                style={styles.eyeButtonInner}
-                onPressIn={handleEyeButtonPressIn}
-                onPressOut={handleEyeButtonPressOut}
-                delayPressIn={0}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="eye" size={26} color="#8B5CF6" />
-              </TouchableOpacity>
-              </Animated.View>
-            </View>
-          )}
-          
-          {/* Completion Animation */}
-          {filteredTransactions.length === 0 && transactions.length === 0 && !loading && (
-            <Animated.View 
-              style={[
-                styles.completionAnimation,
-                {
-                  opacity: completionOpacity,
-                  transform: [{ scale: completionScale }],
-                },
-              ]}
-            >
-              <Ionicons name="checkmark-circle" size={80} color="#10B981" />
-              <Text style={styles.completionText}>All Done!</Text>
-            </Animated.View>
-          )}
-        </View>
+        />
 
-        {/* Bottom Action Bar */}
-        {filteredTransactions.length > 0 && showActionButtons && (
-          <TouchableOpacity
-            style={styles.actionBarOverlay}
-            activeOpacity={1}
-            onPress={() => {
-              setShowActionButtons(false);
-            }}
-          >
-            <View 
-              style={styles.bottomActionBar} 
-              onStartShouldSetResponder={() => true}
-              onResponderTerminationRequest={() => false}
-            >
-              <TouchableOpacity
-                style={[styles.actionPill, styles.rejectPill]}
-                onPress={() => {
-                  handleManualAction('rejected', null, 'reject');
-                  setShowActionButtons(false);
-                }}
-              >
-                <Ionicons name="close-outline" size={20} color="#6B7280" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.actionPill, styles.favoritePill]}
-                onPress={() => {
-                  handleManualAction('special', null, 'favorite');
-                  setShowActionButtons(false);
-                }}
-              >
-                <Ionicons name="star-outline" size={20} color="#6B7280" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.actionPill, styles.foodPill]}
-                onPress={() => {
-                  handleManualAction('confirmed', 'food', 'food');
-                  setShowActionButtons(false);
-                }}
-              >
-                <Ionicons name="restaurant-outline" size={20} color="#6B7280" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.actionPill, styles.confirmPill]}
-                onPress={() => {
-                  handleManualAction('confirmed', null, 'confirm');
-                  setShowActionButtons(false);
-                }}
-              >
-                <Ionicons name="checkmark-outline" size={20} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* Bottom Info Bar */}
-        {!showActionButtons && (
-          <View style={styles.bottomInfoBar}>
-            <View style={styles.bottomInfoLeft}>
-              {filteredTransactions.length > 0 ? (
-                <Text style={styles.cardsRemainingText}>
-                  {remainingCount} {remainingCount === 1 ? 'card' : 'cards'} remaining
-                </Text>
-              ) : (
-                <Text style={styles.cardsRemainingText}>
-                  All cards processed
-                </Text>
-              )}
-            </View>
-            <View style={styles.bottomInfoRight}>
-              <TouchableOpacity
-                style={styles.summaryButton}
-                onPress={() => navigation.navigate('Summary')}
-              >
-                <Text style={styles.summaryButtonText}>Summary</Text>
-              </TouchableOpacity>
-              {filteredTransactions.length > 0 && (
-                <TouchableOpacity
-                  style={styles.starButton}
-                  onPress={() => setShowActionButtons(true)}
-                >
-                  <Ionicons name="star-outline" size={20} color="#6B7280" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
+        <BottomBar
+          showActionButtons={showActionButtons}
+          hasCards={filteredTransactions.length > 0}
+          remainingCount={remainingCount}
+          onCloseActions={() => setShowActionButtons(false)}
+          onReject={() => {
+            handleManualAction('rejected', null, 'reject');
+            setShowActionButtons(false);
+          }}
+          onFavorite={() => {
+            handleManualAction('special', null, 'favorite');
+            setShowActionButtons(false);
+          }}
+          onFood={() => {
+            handleManualAction('confirmed', 'food', 'food');
+            setShowActionButtons(false);
+          }}
+          onConfirm={() => {
+            handleManualAction('confirmed', null, 'confirm');
+            setShowActionButtons(false);
+          }}
+          onSummaryPress={() => navigation.navigate('Summary')}
+          onOpenActions={() => setShowActionButtons(true)}
+          paddingHorizontal={spacing.xl}
+          paddingVertical={spacing.lg}
+        />
 
         {/* Show Prev Card Modal */}
         <Modal
@@ -733,260 +552,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   splashTitle: {
-    marginTop: 24,
+    marginTop: spacing.xxl,
     fontSize: 24,
     fontWeight: '700',
     color: '#1F2937',
     textAlign: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: spacing.xl * 2,
     letterSpacing: -0.5,
   },
   splashLoader: {
-    marginTop: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#8E8E93',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  header: {
-    backgroundColor: '#8B5CF6', // Purple
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-  },
-  headerSpacer: {
-    height: Platform.OS === 'ios' ? 0 : 10,
-  },
-  headerTitle: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 1.5,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-    textTransform: 'uppercase',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    opacity: 0.9,
-    letterSpacing: 0.5,
-  },
-  filterSection: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-  },
-  dateFilterPill: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-    marginHorizontal: 6,
-  },
-  dateFilterPillActive: {
-    backgroundColor: '#F0F4FF',
-    borderColor: '#8B5CF6',
-  },
-  dateFilterPillText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  dateFilterPillTextActive: {
-    color: '#8B5CF6',
-    fontWeight: '600',
-  },
-  eyeButtonContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 20,
-    zIndex: 1000,
-    pointerEvents: 'box-none',
-  },
-  draggableEyeButton: {
-    width: 52,
-    height: 52,
-  },
-  eyeButtonInner: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#8B5CF6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#8B5CF6',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  eyeIconBold: {
-    fontWeight: 'bold',
-  },
-  cardsContainer: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  starContainer: {
-    marginBottom: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTextContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  emptyTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1F2937',
-    letterSpacing: -0.8,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    lineHeight: 24,
-  },
-  actionBarOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    top: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'flex-end',
-  },
-  bottomActionBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  actionPill: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rejectPill: {
-    backgroundColor: '#FFF5F5',
-    borderWidth: 1.5,
-    borderColor: '#FCA5A5',
-  },
-  favoritePill: {
-    backgroundColor: '#F0F4FF',
-    borderWidth: 1.5,
-    borderColor: '#A5B4FC',
-  },
-  foodPill: {
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1.5,
-    borderColor: '#FCD34D',
-  },
-  confirmPill: {
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1.5,
-    borderColor: '#86EFAC',
-  },
-  bottomInfoBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  bottomInfoLeft: {
-    flex: 1,
-  },
-  bottomInfoRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  cardsRemainingText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  summaryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#8B5CF6',
-  },
-  summaryButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#8B5CF6',
-    letterSpacing: 0.3,
-  },
-  starButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginTop: spacing.xxl + spacing.sm,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.xl,
   },
   modalContent: {
-    width: SCREEN_WIDTH - 40,
+    width: SCREEN_WIDTH - spacing.xl * 2,
     maxHeight: '70%',
     borderRadius: 24,
     backgroundColor: '#FFFFFF',
-    padding: 24,
+    padding: spacing.xl + spacing.sm,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -1000,7 +589,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   modalTitle: {
     fontSize: 20,
@@ -1022,25 +611,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalCardContent: {
-    paddingTop: 12,
+    paddingTop: spacing.md,
   },
   modalCardSender: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   modalCardBody: {
     fontSize: 15,
     color: '#6B7280',
     lineHeight: 22,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   modalCardAmount: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   modalCardTime: {
     fontSize: 13,
@@ -1048,13 +637,13 @@ const styles = StyleSheet.create({
   },
   modalEmptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: spacing.xxl,
   },
   modalEmptyTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   modalEmptyText: {
     fontSize: 14,
