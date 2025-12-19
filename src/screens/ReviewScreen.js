@@ -452,6 +452,18 @@ const ReviewScreen = ({ navigation }) => {
                 Month
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateFilterPill, dateFilter === 'all' && styles.dateFilterPillActive]}
+              onPress={async () => {
+                setDateFilter('all');
+                // Auto-scan when filter is clicked
+                await handleScan();
+              }}
+            >
+              <Text style={[styles.dateFilterPillText, dateFilter === 'all' && styles.dateFilterPillTextActive]}>
+                All
+              </Text>
+            </TouchableOpacity>
           </View>
 
         </View>
