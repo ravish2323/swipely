@@ -3,65 +3,56 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Dimensions,
   Modal,
-  Animated,
+  TouchableOpacity,
   Platform,
+  Animated,
+  Dimensions,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import SwipeCard from '../components/SwipeCard';
 import ScreenShell from '../components/ScreenShell';
-import FilterBar from '../components/review/FilterBar';
-import BottomBar from '../components/review/BottomBar';
-import CardStage from '../components/review/CardStage';
-import StarCelebration from '../components/review/StarCelebration';
-import EyeButtonWithCount from '../components/review/EyeButtonWithCount';
+import FilterPills from '../components/FilterPills';
+import ProgressRow from '../components/ProgressRow';
+import TransactionCard from '../components/TransactionCard';
+import SwipeHints from '../components/SwipeHints';
+import ActionBar from '../components/ActionBar';
+import BottomBar from '../components/BottomBar';
+import CelebrationBurst from '../components/CelebrationBurst';
 import {
   getPendingTransactions,
   updateTransactionStatus,
   updateTransactionCategory,
 } from '../services/database';
 import SMSService from '../services/smsService';
-import spacing from '../theme/spacing';
+import { colors, spacing } from '../theme/tokens';
+import { colors as tokenColors } from '../theme/tokens';
+import { durations, easing } from '../theme/anim';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Optional haptics import
+let Haptics = null;
+try {
+  Haptics = require('expo-haptics').default || require('expo-haptics');
+} catch (e) {
+  // Haptics not available
+}
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const ReviewScreen = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showActionButtons, setShowActionButtons] = useState(false);
   const [dateFilter, setDateFilter] = useState('today');
   const [showPrevCardModal, setShowPrevCardModal] = useState(false);
   const [lastAction, setLastAction] = useState(null);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
-
-  // Star animation for completion
-  const starScale = useRef(new Animated.Value(0)).current;
-  const starRotation = useRef(new Animated.Value(0)).current;
-  const textOpacity = useRef(new Animated.Value(0)).current;
-  const textScale = useRef(new Animated.Value(0.8)).current;
-
-  // Hide action buttons when all cards are processed
-  useEffect(() => {
-    if (filteredTransactions.length === 0 && showActionButtons) {
-      setShowActionButtons(false);
-    }
-  }, [filteredTransactions.length, showActionButtons]);
-
-  // Completion animation trigger
-  useEffect(() => {
-    const shouldShowEmpty = filteredTransactions.length === 0 && transactions.length === 0;
-    if (shouldShowEmpty) {
-      // Trigger StarCelebration animation via autoStart prop
-      starScale.setValue(0);
-      starRotation.setValue(0);
-      textOpacity.setValue(0);
-      textScale.setValue(0.8);
-    }
-  }, [filteredTransactions.length, transactions.length, starScale, starRotation, textOpacity, textScale]);
+  const [overlayColor, setOverlayColor] = useState(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [sessionTotal, setSessionTotal] = useState(0);
+  const [sessionProcessed, setSessionProcessed] = useState(0);
+  const actionBarAnimation = useRef(new Animated.Value(0)).current;
 
   const loadTransactions = useCallback(async (showLoading = false) => {
     try {
@@ -70,7 +61,13 @@ const ReviewScreen = ({ navigation }) => {
       }
       const pending = await getPendingTransactions();
       setTransactions(pending);
-      applyDateFilter(pending, dateFilter);
+      const filtered = applyDateFilter(pending, dateFilter);
+      
+      // Reset session tracking when loading new data
+      if (showLoading) {
+        setSessionTotal(filtered.length);
+        setSessionProcessed(0);
+      }
     } catch (error) {
       console.error('Error loading transactions:', error);
       if (showLoading) {
@@ -86,7 +83,7 @@ const ReviewScreen = ({ navigation }) => {
   const applyDateFilter = (txns, filter) => {
     if (!txns || txns.length === 0) {
       setFilteredTransactions([]);
-      return;
+      return [];
     }
 
     const now = new Date();
@@ -107,58 +104,79 @@ const ReviewScreen = ({ navigation }) => {
         startDate.setHours(0, 0, 0, 0);
         break;
       default:
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
+        startDate = null;
         break;
     }
 
-    const startTimestamp = Math.floor(startDate.getTime() / 1000);
-    const filtered = txns.filter(t => t.timestamp >= startTimestamp);
-    setFilteredTransactions(filtered);
+    if (startDate) {
+      const startTimestamp = Math.floor(startDate.getTime() / 1000);
+      const filtered = txns.filter(t => t.timestamp >= startTimestamp);
+      setFilteredTransactions(filtered);
+      return filtered;
+    } else {
+      setFilteredTransactions(txns);
+      return txns;
+    }
   };
 
   useEffect(() => {
     loadTransactions(true);
-    
+
     const unsubscribe = navigation.addListener('focus', () => {
       loadTransactions(true);
     });
-    
+
     return () => {
       unsubscribe();
     };
   }, [navigation, loadTransactions]);
 
   useEffect(() => {
-    applyDateFilter(transactions, dateFilter);
+    const filtered = applyDateFilter(transactions, dateFilter);
+    // Reset session tracking when filter changes
+    setSessionTotal(filtered.length);
+    setSessionProcessed(0);
   }, [dateFilter, transactions]);
 
   const handleSwipe = async (id, status, category = null, actionType = null) => {
     try {
       const transaction = transactions.find(t => t.id === id);
-      
+
       if (transaction) {
         let actionTypeName = 'confirm';
         if (status === 'rejected') actionTypeName = 'reject';
         else if (status === 'special') actionTypeName = 'favorite';
         else if (category === 'food') actionTypeName = 'food';
-        
+
         setLastAction({
           type: actionTypeName,
           transaction: { ...transaction },
         });
       }
 
-      await updateTransactionStatus(id, status);
-      if (category) {
-        await updateTransactionCategory(id, category);
-      }
-      
+      // Update UI state IMMEDIATELY (before async DB update) for instant feedback
       const newTransactions = transactions.filter(t => t.id !== id);
+      const newFiltered = filteredTransactions.filter(t => t.id !== id);
+      
       setTransactions(newTransactions);
-      applyDateFilter(newTransactions, dateFilter);
+      setFilteredTransactions(newFiltered);
+      setOverlayColor(null);
+      
+      // Update session processed count
+      setSessionProcessed(prev => prev + 1);
+
+      // Update database asynchronously (non-blocking)
+      try {
+        await updateTransactionStatus(id, status);
+        if (category) {
+          await updateTransactionCategory(id, category);
+        }
+      } catch (dbError) {
+        console.error('Error updating transaction in database:', dbError);
+        // Don't show alert - UI already updated, just log the error
+      }
     } catch (error) {
-      console.error('Error updating transaction:', error);
+      console.error('Error in handleSwipe:', error);
       Alert.alert('Error', 'Failed to update transaction');
     }
   };
@@ -166,17 +184,28 @@ const ReviewScreen = ({ navigation }) => {
   const handleManualAction = async (status, category = null, actionType = null) => {
     if (filteredTransactions.length === 0) return;
     const current = filteredTransactions[0];
-    await handleSwipe(current.id, status, category, actionType);
-  };
 
+    // Set overlay color for visual feedback
+    if (status === 'rejected') setOverlayColor(tokenColors.rejectBg);
+    else if (status === 'special') setOverlayColor(tokenColors.specialBg);
+    else if (category === 'food') setOverlayColor(tokenColors.foodBg);
+    else if (status === 'confirmed') setOverlayColor(tokenColors.successBg);
+
+    // Small delay for visual feedback, then swipe
+    setTimeout(() => {
+      handleSwipe(current.id, status, category, actionType);
+    }, 100);
+    
+    // Don't close actions - allow multiple actions
+  };
 
   const getActionColor = (actionType) => {
     switch (actionType) {
-      case 'reject': return '#ffe6e6';
-      case 'favorite': return '#edf0ff';
-      case 'food': return '#fff5d9';
-      case 'confirm': return '#e8f7f0';
-      default: return '#FFFFFF';
+      case 'reject': return tokenColors.rejectBg;
+      case 'favorite': return tokenColors.specialBg;
+      case 'food': return tokenColors.foodBg;
+      case 'confirm': return tokenColors.successBg;
+      default: return colors.bg;
     }
   };
 
@@ -190,22 +219,49 @@ const ReviewScreen = ({ navigation }) => {
     }
   };
 
-  // Eye button - show on press, hide on release
-  const handleEyeButtonPressIn = () => {
-    setShowPrevCardModal(true);
+  const handleFilterChange = (filter) => {
+    setDateFilter(filter);
+    // Filter is applied automatically by useEffect that watches dateFilter
+    // No need to reload from database - just filter existing transactions
   };
-  
-  const handleEyeButtonPressOut = () => {
-    setShowPrevCardModal(false);
+
+  const toggleActions = () => {
+    const toValue = actionsOpen ? 0 : 1;
+    setActionsOpen(!actionsOpen);
+
+    // Haptic feedback
+    if (Haptics && Haptics.ImpactFeedbackStyle) {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (e) {
+        // Haptics failed
+      }
+    }
+
+    Animated.timing(actionBarAnimation, {
+      toValue,
+      duration: 180,
+      easing: easing.out,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeActions = () => {
+    if (actionsOpen) {
+      setActionsOpen(false);
+      Animated.timing(actionBarAnimation, {
+        toValue: 0,
+        duration: 180,
+        easing: easing.out,
+        useNativeDriver: true,
+      }).start();
+    }
   };
 
   if (loading) {
     return (
       <View style={styles.splashContainer}>
-        <View style={styles.splashContent}>
-          <Ionicons name="flash" size={64} color="#8B5CF6" />
-          <Text style={styles.splashTitle}>Swipe your expenses into control</Text>
-        </View>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -214,35 +270,23 @@ const ReviewScreen = ({ navigation }) => {
   const remainingCount = filteredTransactions.length;
   const hasCards = filteredTransactions.length > 0;
 
-  // Render empty state with navigation - single star animation
   const renderEmptyState = () => {
     if (filteredTransactions.length === 0 && transactions.length === 0) {
       return (
-        <StarCelebration
-          title="All Done!"
-          subtitle="You've processed all transactions for this period."
-          autoStart={true}
-          onAnimationComplete={() => {
-            setTimeout(() => {
-              navigation.navigate('Summary');
-            }, 1500);
-          }}
-        />
-      );
-    }
-    return null;
-  };
-
-  // Render eye button with cards count - pinned top-right
-  const renderEyeButton = () => {
-    if (transactions.length > 0) {
-      return (
-        <EyeButtonWithCount
-          remainingCount={remainingCount}
-          hasCards={hasCards}
-          onPressIn={handleEyeButtonPressIn}
-          onPressOut={handleEyeButtonPressOut}
-        />
+        <View style={styles.emptyContainer}>
+          <CelebrationBurst
+            visible={true}
+            onDone={() => {
+              // Animation complete, keep static UI
+            }}
+          />
+          <View style={styles.emptyStateContent}>
+            <Text style={styles.emptyStateTitle}>All caught up!</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              You've reviewed everything for this period.
+            </Text>
+          </View>
+        </View>
       );
     }
     return null;
@@ -252,57 +296,98 @@ const ReviewScreen = ({ navigation }) => {
     <ScreenShell
       title="Review"
       topSlot={
-        <FilterBar
-          activeFilter={dateFilter}
-          onFilterChange={setDateFilter}
-          onScan={async () => {
-            // Auto-scan on filter change
-            try {
-              await SMSService.initialize();
-              if (SMSService.hasPermission && SMSService.loadRecentSMS) {
-                await SMSService.loadRecentSMS();
-                loadTransactions(false);
-              }
-            } catch (error) {
-              console.error('Error scanning SMS:', error);
-            }
-          }}
-        />
+        <>
+          <FilterPills activeFilter={dateFilter} onFilterChange={handleFilterChange} />
+          {hasCards && (
+            <ProgressRow
+              total={sessionTotal || remainingCount}
+              remaining={remainingCount}
+              onEyePressIn={() => setShowPrevCardModal(true)}
+              onEyePressOut={() => setShowPrevCardModal(false)}
+            />
+          )}
+        </>
       }
       bottomSlot={
-        <BottomBar
-          showActionButtons={showActionButtons}
-          hasCards={hasCards}
-          onCloseActions={() => setShowActionButtons(false)}
-          onReject={() => handleManualAction('rejected', null, 'reject')}
-          onFavorite={() => handleManualAction('special', null, 'favorite')}
-          onFood={() => handleManualAction('confirmed', 'food', 'food')}
-          onConfirm={() => handleManualAction('confirmed', null, 'confirm')}
-          onSummaryPress={() => navigation.navigate('Summary')}
-          onOpenActions={() => setShowActionButtons(true)}
-        />
+        hasCards ? (
+          <>
+            <SwipeHints />
+            {/* Action Bar - conditionally visible above bottom bar */}
+            <Animated.View
+              style={[
+                styles.actionBarContainer,
+                {
+                  opacity: actionBarAnimation,
+                  transform: [
+                    {
+                      translateY: actionBarAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [100, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+              pointerEvents={actionsOpen ? 'auto' : 'none'}
+            >
+              <View style={styles.actionBarWrapper} testID="actionBar">
+                <ActionBar
+                  onReject={() => handleManualAction('rejected', null, 'reject')}
+                  onFood={() => handleManualAction('confirmed', 'food', 'food')}
+                  onSpecial={() => handleManualAction('special', null, 'favorite')}
+                  onConfirm={() => handleManualAction('confirmed', null, 'confirm')}
+                />
+              </View>
+            </Animated.View>
+            {/* Bottom Bar - always visible */}
+            <BottomBar
+              onSummaryPress={() => navigation.navigate('Summary')}
+              onActionsToggle={toggleActions}
+              actionsOpen={actionsOpen}
+            />
+          </>
+        ) : (
+          <BottomBar
+            onSummaryPress={() => navigation.navigate('Summary')}
+            onActionsToggle={null}
+            actionsOpen={false}
+          />
+        )
       }
     >
-      <CardStage
-        hasCards={hasCards}
-        renderCard={() => (
-          currentCard && (
-            <SwipeCard
+      <View style={styles.body}>
+        {hasCards && currentCard ? (
+          <View style={styles.cardContainer}>
+            <TransactionCard
               key={currentCard.id}
               transaction={currentCard}
               onSwipe={handleSwipe}
-              index={0}
-              showAmount={true}
-              showActionButtons={showActionButtons}
-              onToggleActionButtons={() => setShowActionButtons(!showActionButtons)}
+              overlayColor={overlayColor}
             />
-          )
+          </View>
+        ) : (
+          renderEmptyState()
         )}
-        renderEmptyState={renderEmptyState}
-        renderEyeButton={renderEyeButton}
-      />
+      </View>
 
-      {/* Eye button modal showing last action */}
+      {/* Overlay modal for closing action buttons when tapping outside */}
+      <Modal
+        visible={actionsOpen}
+        transparent={true}
+        animationType="none"
+        onRequestClose={closeActions}
+      >
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          {/* Overlay that covers everything except bottom action area */}
+          <Pressable
+            style={{ flex: 1, marginBottom: 200 }} // Approximate height for action bar + bottom bar
+            onPress={closeActions}
+            testID="actionBarOverlay"
+          />
+        </View>
+      </Modal>
+
+      {/* Eye button modal */}
       <Modal
         visible={showPrevCardModal}
         transparent={true}
@@ -320,10 +405,12 @@ const ReviewScreen = ({ navigation }) => {
             </View>
 
             {lastAction ? (
-              <View style={[
-                styles.modalCardContent,
-                { backgroundColor: getActionColor(lastAction.type) }
-              ]}>
+              <View
+                style={[
+                  styles.modalCardContent,
+                  { backgroundColor: getActionColor(lastAction.type) },
+                ]}
+              >
                 <Text style={styles.modalCardSender}>{lastAction.transaction.sender}</Text>
                 <Text style={styles.modalCardBody}>{lastAction.transaction.body}</Text>
                 <Text style={styles.modalCardAmount}>
@@ -358,21 +445,69 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg,
   },
-  splashContent: {
+  body: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  cardContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    position: 'relative',
+  },
+  emptyStateContent: {
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 120, // Space for animation above
+    paddingHorizontal: spacing.xl,
   },
-  splashTitle: {
-    marginTop: spacing.xxl,
-    fontSize: 24,
+  emptyStateTitle: {
+    fontSize: 32,
     fontWeight: '700',
-    color: '#1F2937',
+    color: colors.textPrimary,
     textAlign: 'center',
-    paddingHorizontal: spacing.xl * 2,
-    letterSpacing: -0.5,
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_700Bold' }) || 'sans-serif',
+    marginBottom: spacing.md,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Inter_700Bold',
+  },
+  emptyStateSubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  viewSummaryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: 18,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  viewSummaryButtonText: {
+    color: colors.bg,
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -385,13 +520,19 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH - spacing.xl * 2,
     maxHeight: '70%',
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg,
     padding: spacing.xl + spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   modalHeader: {
     marginBottom: spacing.xl,
@@ -399,7 +540,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.textPrimary,
     fontFamily: Platform.OS === 'ios' ? 'System' : 'Inter_700Bold',
   },
   modalCardContent: {
@@ -410,24 +551,24 @@ const styles = StyleSheet.create({
   modalCardSender: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   modalCardBody: {
     fontSize: 15,
-    color: '#6B7280',
+    color: colors.textSecondary,
     lineHeight: 22,
     marginBottom: spacing.lg,
   },
   modalCardAmount: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   modalCardTime: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
   },
   modalActionBadge: {
@@ -441,7 +582,7 @@ const styles = StyleSheet.create({
   modalActionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: colors.textPrimary,
   },
   modalEmptyState: {
     alignItems: 'center',
@@ -449,9 +590,23 @@ const styles = StyleSheet.create({
   },
   modalEmptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  actionBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  actionBarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  actionBarWrapper: {
+    backgroundColor: colors.bg,
   },
 });
 

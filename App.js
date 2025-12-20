@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Text, ActivityIndicator, Platform, Animated, Image } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, Platform } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -18,6 +18,8 @@ import {
 } from '@expo-google-fonts/space-grotesk';
 import ReviewScreen from './src/screens/ReviewScreen';
 import SummaryScreen from './src/screens/SummaryScreen';
+import LoadingScreen from './src/screens/LoadingScreen';
+import OnboardingGate from './src/navigation/OnboardingGate';
 import { initDatabase } from './src/services/database';
 import SMSService from './src/services/smsService';
 
@@ -27,10 +29,6 @@ export default function App() {
   const [dbInitialized, setDbInitialized] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Pulsing animation for bolt
-  const boltScale = useRef(new Animated.Value(1)).current;
-  const boltOpacity = useRef(new Animated.Value(1)).current;
   
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -77,68 +75,9 @@ export default function App() {
     }
   }, [fontsLoaded]);
 
-  useEffect(() => {
-    if (!fontsLoaded || initializing || !dbInitialized) {
-      // Pulsing animation for bolt
-      const pulseAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(boltScale, {
-              toValue: 1.2,
-              duration: 800,
-              useNativeDriver: true,
-            }),
-            Animated.timing(boltOpacity, {
-              toValue: 0.6,
-              duration: 800,
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.parallel([
-            Animated.timing(boltScale, {
-              toValue: 1,
-              duration: 800,
-              useNativeDriver: true,
-            }),
-            Animated.timing(boltOpacity, {
-              toValue: 1,
-              duration: 800,
-              useNativeDriver: true,
-            }),
-          ]),
-        ])
-      );
-      pulseAnimation.start();
-      return () => pulseAnimation.stop();
-    }
-  }, [fontsLoaded, initializing, dbInitialized, boltScale, boltOpacity]);
 
   if (!fontsLoaded || initializing || !dbInitialized) {
-    return (
-      <View style={styles.splashContainer}>
-        <View style={styles.splashContent}>
-          <Animated.View
-            style={{
-              transform: [{ scale: boltScale }],
-              opacity: boltOpacity,
-            }}
-          >
-            <Image
-              source={require('./assets/ChatGPT Image Dec 20, 2025, 10_45_05 PM.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
-          <Text style={styles.splashTitle}>Swipe your expenses into control</Text>
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>⚠️ {error}</Text>
-              <Text style={styles.errorSubtext}>The app will still work, but some features may be limited.</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    );
+    return <LoadingScreen error={error} />;
   }
 
   if (error && !initializing) {
@@ -155,34 +94,42 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
-      <Stack.Navigator
-        initialRouteName="Review"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#6200EE',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: '600',
-            fontFamily: Platform.OS === 'ios' ? 'System' : 'Inter_600SemiBold',
-          },
+      <OnboardingGate
+        onOnboardingComplete={(demoMode) => {
+          if (demoMode) {
+            console.log('Demo mode enabled');
+          }
         }}
       >
-        <Stack.Screen
-          name="Review"
-          component={ReviewScreen}
-          options={{ 
-            headerShown: false,
+        <Stack.Navigator
+          initialRouteName="Review"
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: '#6200EE',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: '600',
+              fontFamily: Platform.OS === 'ios' ? 'System' : 'Inter_600SemiBold',
+            },
           }}
-        />
-        <Stack.Screen
-          name="Summary"
-          component={SummaryScreen}
-          options={{ 
-            headerShown: false,
-          }}
-        />
-      </Stack.Navigator>
+        >
+          <Stack.Screen
+            name="Review"
+            component={ReviewScreen}
+            options={{ 
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="Summary"
+            component={SummaryScreen}
+            options={{ 
+              headerShown: false,
+            }}
+          />
+        </Stack.Navigator>
+      </OnboardingGate>
     </NavigationContainer>
   );
 }
@@ -192,37 +139,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  splashContainer: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  splashContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoImage: {
-    width: 200,
-    height: 200,
-  },
-  splashTitle: {
-    marginTop: 24,
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    letterSpacing: -0.5,
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_700Bold' }) || 'sans-serif',
-  },
-  errorContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
-    maxWidth: '90%',
   },
   errorTitle: {
     fontSize: 20,

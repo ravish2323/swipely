@@ -8,6 +8,7 @@ import {
   Text,
   Animated,
 } from 'react-native';
+import { radii } from '../theme/tokens';
 
 const ScreenShell = ({
   title,
@@ -78,6 +79,9 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 16,
     paddingHorizontal: 20,
+    borderTopLeftRadius: radii.card,
+    borderTopRightRadius: radii.card,
+    overflow: 'hidden',
   },
   headerTitle: {
     fontSize: 32,
