@@ -6,7 +6,6 @@ import spacing from '../../theme/spacing';
 const BottomBar = ({
   showActionButtons,
   hasCards,
-  remainingCount,
   onCloseActions,
   onReject,
   onFavorite,
@@ -59,25 +58,17 @@ const BottomBar = ({
             { paddingHorizontal, paddingVertical },
           ]}
         >
-          <View style={styles.bottomInfoLeft}>
-            {hasCards ? (
-              <Text style={styles.cardsRemainingText}>
-                {remainingCount} {remainingCount === 1 ? 'card' : 'cards'} remaining
-              </Text>
-            ) : (
-              <Text style={styles.cardsRemainingText}>All cards processed</Text>
-            )}
-          </View>
-          <View style={styles.bottomInfoRight}>
-            <TouchableOpacity style={styles.summaryButton} onPress={onSummaryPress}>
-              <Text style={styles.summaryButtonText}>Summary</Text>
+          <TouchableOpacity 
+            style={[styles.summaryButton, !hasCards && styles.summaryButtonFull]} 
+            onPress={onSummaryPress}
+          >
+            <Text style={styles.summaryButtonText}>Summary</Text>
+          </TouchableOpacity>
+          {hasCards && (
+            <TouchableOpacity style={styles.starButton} onPress={onOpenActions}>
+              <Ionicons name="star-outline" size={20} color="#6B7280" />
             </TouchableOpacity>
-            {hasCards && (
-              <TouchableOpacity style={styles.starButton} onPress={onOpenActions}>
-                <Ionicons name="star-outline" size={20} color="#6B7280" />
-              </TouchableOpacity>
-            )}
-          </View>
+          )}
         </View>
       )}
     </>
@@ -136,27 +127,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
-  },
-  bottomInfoLeft: {
-    flex: 1,
-  },
-  bottomInfoRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
   },
-  cardsRemainingText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
   summaryButton: {
-    paddingHorizontal: spacing.xl + spacing.sm,
+    flex: 1,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: 24,
     backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: '#8B5CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryButtonFull: {
+    flex: 1,
   },
   summaryButtonText: {
     fontSize: 15,

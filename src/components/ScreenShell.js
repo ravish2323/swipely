@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Platform,
   Text,
+  Animated,
 } from 'react-native';
 
 const ScreenShell = ({
@@ -18,6 +19,8 @@ const ScreenShell = ({
   contentContainerStyle,
   bodyStyle,
   scrollProps = {},
+  bodyAnimatedStyle,
+  bodyPanHandlers,
 }) => {
   const BodyComponent = useScrollView ? ScrollView : View;
   const bodyProps = useScrollView
@@ -29,6 +32,15 @@ const ScreenShell = ({
     : {
         style: [styles.body, styles.bodyContent, bodyStyle, contentContainerStyle],
       };
+
+  // Wrap body in Animated.View if animation props are provided
+  const BodyWrapper = bodyAnimatedStyle || bodyPanHandlers ? Animated.View : View;
+  const bodyWrapperProps = bodyAnimatedStyle || bodyPanHandlers
+    ? {
+        style: [styles.bodyWrapper, bodyAnimatedStyle],
+        ...bodyPanHandlers,
+      }
+    : { style: styles.bodyWrapper };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -42,7 +54,9 @@ const ScreenShell = ({
 
         {topSlot}
 
-        <BodyComponent {...bodyProps}>{children}</BodyComponent>
+        <BodyWrapper {...bodyWrapperProps}>
+          <BodyComponent {...bodyProps}>{children}</BodyComponent>
+        </BodyWrapper>
 
         {bottomSlot}
       </View>
@@ -66,12 +80,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: 36,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '600',
     color: '#FFFFFF',
-    letterSpacing: 1.5,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'System' : Platform.select({ android: 'Inter_600SemiBold' }) || 'sans-serif',
   },
   headerSubtitle: {
     fontSize: 14,
@@ -80,6 +93,9 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     letterSpacing: 0.5,
     marginTop: 4,
+  },
+  bodyWrapper: {
+    flex: 1,
   },
   body: {
     flex: 1,

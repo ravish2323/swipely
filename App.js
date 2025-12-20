@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Text, ActivityIndicator, Platform, Animated } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, Platform, Animated, Image } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -56,9 +56,9 @@ export default function App() {
         await SMSService.initialize();
         console.log('✅ SMS service initialized');
         
-        // Give a moment for mock data to be saved
+        // Give a moment for mock data to be saved (reduced delay for faster loading)
         console.log('⏳ Waiting for data to load...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         console.log('✅ App initialization complete!');
         setDbInitialized(true);
@@ -123,7 +123,11 @@ export default function App() {
               opacity: boltOpacity,
             }}
           >
-            <Ionicons name="flash" size={64} color="#8B5CF6" />
+            <Image
+              source={require('./assets/ChatGPT Image Dec 20, 2025, 10_45_05 PM.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </Animated.View>
           <Text style={styles.splashTitle}>Swipe your expenses into control</Text>
           {error && (
@@ -198,6 +202,10 @@ const styles = StyleSheet.create({
   splashContent: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logoImage: {
+    width: 200,
+    height: 200,
   },
   splashTitle: {
     marginTop: 24,

@@ -36,10 +36,11 @@ export const useSwipeNavigation = ({
 
       const toValue = direction === 'left' ? -SCREEN_WIDTH : SCREEN_WIDTH;
 
+      // Smoother iOS-like easing
       Animated.timing(translateX, {
         toValue,
         duration,
-        easing: Easing.out(Easing.cubic),
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
         useNativeDriver: true,
       }).start(() => {
         navigate();
@@ -54,24 +55,49 @@ export const useSwipeNavigation = ({
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (evt, gestureState) => {
+          // Only activate from screen edges to avoid conflicts with card swipes
           const touchX = evt.nativeEvent.locationX;
+          const isHorizontalSwipe = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+          
+          // Only activate if near screen edge
           const nearScreenEdge =
             edgeActivationWidth === 0 ||
             touchX <= edgeActivationWidth ||
             touchX >= SCREEN_WIDTH - edgeActivationWidth;
-          return Math.abs(gestureState.dx) > 10 && nearScreenEdge;
+          
+          // Require significant horizontal movement and be near edge
+          if (!nearScreenEdge || !isHorizontalSwipe) {
+            return false;
+          }
+          
+          // Require minimum distance to avoid accidental activation
+          return Math.abs(gestureState.dx) > 15;
         },
         onPanResponderGrant: () => {
           translateX.stopAnimation();
         },
         onPanResponderMove: (evt, gestureState) => {
-          translateX.setValue(gestureState.dx);
+          // Clamp the translation to prevent over-swiping
+          const clampedDx = Math.max(-SCREEN_WIDTH, Math.min(SCREEN_WIDTH, gestureState.dx));
+          translateX.setValue(clampedDx);
         },
         onPanResponderRelease: (evt, gestureState) => {
-          if (gestureState.dx > threshold) {
-            animateToDirection('right');
-          } else if (gestureState.dx < -threshold) {
-            animateToDirection('left');
+          const velocity = gestureState.vx;
+          const shouldNavigate = Math.abs(gestureState.dx) > threshold || Math.abs(velocity) > 0.5;
+          
+          if (shouldNavigate) {
+            if (gestureState.dx > 0 || velocity > 0.3) {
+              animateToDirection('right');
+            } else if (gestureState.dx < 0 || velocity < -0.3) {
+              animateToDirection('left');
+            } else {
+              Animated.spring(translateX, {
+                toValue: 0,
+                useNativeDriver: true,
+                tension: 50,
+                friction: 7,
+              }).start();
+            }
           } else {
             Animated.spring(translateX, {
               toValue: 0,
@@ -85,15 +111,38 @@ export const useSwipeNavigation = ({
     [animateToDirection, edgeActivationWidth, threshold, translateX]
   );
 
+  // Improved animation with scale and shadow for peek effect
   const animatedStyle = useMemo(
     () => ({
-      transform: [{ translateX }],
+      transform: [
+        { translateX },
+        {
+          scale: translateX.interpolate({
+            inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+            outputRange: [0.95, 1, 0.95],
+            extrapolate: 'clamp',
+          }),
+        },
+      ],
       opacity: translateX.interpolate({
         inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-        outputRange: [0, 1, 0],
+        outputRange: [0.7, 1, 0.7],
         extrapolate: 'clamp',
       }),
       backgroundColor: backdropColor,
+      shadowColor: '#000',
+      shadowOpacity: translateX.interpolate({
+        inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+        outputRange: [0.3, 0, 0.3],
+        extrapolate: 'clamp',
+      }),
+      shadowRadius: 10,
+      shadowOffset: { width: -5, height: 0 },
+      elevation: translateX.interpolate({
+        inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+        outputRange: [8, 0, 8],
+        extrapolate: 'clamp',
+      }),
     }),
     [backdropColor, translateX]
   );
@@ -104,6 +153,7 @@ export const useSwipeNavigation = ({
     navigateLeft: () => animateToDirection('left'),
     navigateRight: () => animateToDirection('right'),
     resetTranslation,
+    translateX, // Expose translateX for peek preview
   };
 };
 

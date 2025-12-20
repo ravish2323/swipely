@@ -255,9 +255,9 @@ const SwipeCard = ({
 
 const styles = StyleSheet.create({
   card: {
-    width: SCREEN_WIDTH - 32,
-    height: SCREEN_HEIGHT * 0.55,
-    maxHeight: 600,
+    width: SCREEN_WIDTH - 40,
+    height: SCREEN_HEIGHT * 0.45,
+    maxHeight: 450,
     borderRadius: 24,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
-    position: 'absolute',
+    position: 'relative',
   },
   cardContent: {
     flex: 1,

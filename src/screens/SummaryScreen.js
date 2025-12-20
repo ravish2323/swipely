@@ -3,19 +3,24 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
   Alert,
   Animated,
-  PanResponder,
   Dimensions,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import ScreenShell from '../components/ScreenShell';
+import { useSwipeNavigation } from '../components/AnimatedNavigationWrapper';
+import SummaryGrid from '../components/summary/SummaryGrid';
+import StatsCard from '../components/summary/StatsCard';
+import DatabaseCard from '../components/summary/DatabaseCard';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = 100;
 import {
   getSummaryStats,
   getTransactionsByStatus,
@@ -24,10 +29,6 @@ import {
   resetDatabase,
 } from '../services/database';
 import SMSService from '../services/smsService';
-import SummaryHeader from '../components/summary/SummaryHeader';
-import SummaryGrid from '../components/summary/SummaryGrid';
-import StatsCard from '../components/summary/StatsCard';
-import DatabaseCard from '../components/summary/DatabaseCard';
 import spacing from '../theme/spacing';
 
 const SummaryScreen = ({ navigation }) => {
@@ -36,7 +37,6 @@ const SummaryScreen = ({ navigation }) => {
   const [foodTransactions, setFoodTransactions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [scanning, setScanning] = useState(false);
   
   // Animation values for cards
   const cardAnimations = useRef([
@@ -100,24 +100,6 @@ const SummaryScreen = ({ navigation }) => {
     loadData();
   };
 
-  const handleScan = async () => {
-    try {
-      setScanning(true);
-      await SMSService.initialize();
-      if (SMSService.hasPermission && SMSService.loadRecentSMS) {
-        await SMSService.loadRecentSMS();
-      }
-      Alert.alert('Success', 'SMS scanning completed!');
-      setTimeout(() => {
-        loadData();
-      }, 1000);
-    } catch (error) {
-      console.error('Error scanning SMS:', error);
-      Alert.alert('Error', 'Failed to scan SMS: ' + (error.message || 'Unknown error'));
-    } finally {
-      setScanning(false);
-    }
-  };
 
   const handleClearTransactions = () => {
     Alert.alert(
@@ -195,302 +177,91 @@ const SummaryScreen = ({ navigation }) => {
 
     return (
       <>
-        <View style={styles.summaryGrid}>
-          <Animated.View 
-            style={[
-              styles.summaryCard, 
-              styles.confirmedCard,
-              {
-                opacity: cardAnimations[0],
-                transform: [{
-                  translateY: cardAnimations[0].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                }],
-              },
-            ]}
-          >
-            <Text style={styles.summaryCardTitle}>CONFIRMED</Text>
-            <Text style={styles.summaryCardValue}>{stats.confirmed.count}</Text>
-            <Text style={styles.summaryCardAmount}>
-              {formatAmount(stats.confirmed.total)}
-            </Text>
-          </Animated.View>
+        <SummaryGrid
+          stats={stats}
+          cardAnimations={cardAnimations}
+          formatAmount={formatAmount}
+        />
 
-          <Animated.View 
-            style={[
-              styles.summaryCard, 
-              styles.foodCard,
-              {
-                opacity: cardAnimations[1],
-                transform: [{
-                  translateY: cardAnimations[1].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                }],
-              },
-            ]}
-          >
-            <Text style={styles.summaryCardTitle}>FOOD</Text>
-            <Text style={styles.summaryCardValue}>{stats.food.count}</Text>
-            <Text style={styles.summaryCardAmount}>
-              {formatAmount(stats.food.total)}
-            </Text>
-          </Animated.View>
+        <StatsCard
+          stats={stats}
+          formatAmount={formatAmount}
+        />
 
-          <Animated.View 
-            style={[
-              styles.summaryCard, 
-              styles.rejectedCard,
-              {
-                opacity: cardAnimations[2],
-                transform: [{
-                  translateY: cardAnimations[2].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                }],
-              },
-            ]}
-          >
-            <Text style={styles.summaryCardTitle}>REJECTED</Text>
-            <Text style={styles.summaryCardValue}>{stats.rejected.count}</Text>
-            <Text style={styles.summaryCardSubtext}>Not tracked</Text>
-          </Animated.View>
-
-          <Animated.View 
-            style={[
-              styles.summaryCard, 
-              styles.specialCard,
-              {
-                opacity: cardAnimations[3],
-                transform: [{
-                  translateY: cardAnimations[3].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                }],
-              },
-            ]}
-          >
-            <Text style={styles.summaryCardTitle}>SPECIAL</Text>
-            <Text style={styles.summaryCardValue}>{stats.special.count}</Text>
-            <Text style={styles.summaryCardAmount}>
-              {formatAmount(stats.special.total)}
-            </Text>
-          </Animated.View>
-
-          <Animated.View 
-            style={[
-              styles.summaryCard, 
-              styles.pendingCard,
-              {
-                opacity: cardAnimations[4],
-                transform: [{
-                  translateY: cardAnimations[4].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                }],
-              },
-            ]}
-          >
-            <Text style={styles.summaryCardTitle}>PENDING</Text>
-            <Text style={styles.summaryCardValue}>{stats.pending.count}</Text>
-            <Text style={styles.summaryCardSubtext}>Awaiting review</Text>
-          </Animated.View>
-        </View>
-
-        <View style={styles.statsCard}>
-          <Text style={styles.statsCardTitle}>Statistics</Text>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Total Transactions Processed</Text>
-            <Text style={styles.statValue}>
-              {stats.confirmed.count + stats.rejected.count + stats.special.count}
-            </Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Total Amount Tracked</Text>
-            <Text style={styles.statValue}>
-              {formatAmount(stats.confirmed.total + stats.special.total)}
-            </Text>
-          </View>
-          <View style={[styles.statRow, styles.statRowLast]}>
-            <Text style={styles.statLabel}>Average Confidence</Text>
-            <Text style={styles.statValue}>
-              {stats.averageConfidence
-                ? Math.round(stats.averageConfidence * 100)
-                : 0}
-              %
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.dbCard}>
-          <Text style={styles.dbCardTitle}>Database Management</Text>
-          <Text style={styles.dbCardDescription}>
-            Manage your transaction data. Use with caution as these actions cannot be undone.
-          </Text>
-          <View style={styles.dbButtonsRow}>
-            <TouchableOpacity
-              style={[styles.dbButton, styles.clearButton]}
-              onPress={handleClearTransactions}
-            >
-              <Text style={styles.dbButtonText}>Clear Transactions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dbButton, styles.resetButton]}
-              onPress={handleResetDatabase}
-            >
-              <Text style={styles.dbButtonText}>Reset Database</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <DatabaseCard
+          onClear={handleClearTransactions}
+          onReset={handleResetDatabase}
+        />
       </>
     );
   };
 
+  // Swipe navigation for body content only - right edge swipe to Review
+  const { animatedStyle, panHandlers, translateX } = useSwipeNavigation({
+    onSwipeRight: () => navigation.navigate('Review'),
+    edgeActivationWidth: 80, // Only activate from 80px from edges
+  });
+
+  // Peek card animation based on translateX
+  const peekCardOpacity = translateX.interpolate({
+    inputRange: [0, 50, SCREEN_WIDTH],
+    outputRange: [0, 0.8, 0],
+    extrapolate: 'clamp',
+  });
+
+  const peekCardTranslateX = translateX.interpolate({
+    inputRange: [0, SCREEN_WIDTH],
+    outputRange: [SCREEN_WIDTH, 0],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <AnimatedNavigationWrapper
-      onSwipeRight={() => navigation.navigate('Review')}
-      style={styles.container}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
+    <ScreenShell
+      title="Summary"
+      useScrollView={true}
+      scrollProps={{
+        refreshControl: (
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-    <SafeAreaView style={styles.safeArea}>
-      <Animated.View 
-        style={[
-          styles.container,
-          {
-            transform: [{ translateX: swipePosition.x }],
-          },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        {/* Purple Header */}
-        <View style={styles.header}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.headerTitle}>Summary</Text>
+        ),
+      }}
+      bodyAnimatedStyle={animatedStyle}
+      bodyPanHandlers={panHandlers}
+    >
+      <SafeAreaView style={styles.safeAreaContent}>
+        <View style={styles.content}>
+          {renderContent()}
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
+        {/* Translucent "Swipe to Review" peek card */}
+        <Animated.View
+          style={[
+            styles.peekCard,
+            {
+              opacity: peekCardOpacity,
+              transform: [{ translateX: peekCardTranslateX }],
+            },
+          ]}
+          pointerEvents="none"
         >
-          <View style={styles.content}>
-          {/* Summary Cards Grid */}
-          <View style={styles.summaryGrid}>
-            <Animated.View 
-              style={[
-                styles.summaryCard, 
-                styles.confirmedCard,
-                {
-                  opacity: cardAnimations[0],
-                  transform: [{
-                    translateY: cardAnimations[0].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    }),
-                  }],
-                },
-              ]}
-            >
-              <Text style={styles.summaryCardTitle}>CONFIRMED</Text>
-              <Text style={styles.summaryCardValue}>{stats.confirmed.count}</Text>
-              <Text style={styles.summaryCardAmount}>
-                {formatAmount(stats.confirmed.total)}
-              </Text>
-            </Animated.View>
-
-            <StatsCard
-              stats={stats}
-              formatAmount={formatAmount}
-              marginBottom={spacing.xxl}
-              padding={spacing.xl}
-            />
-
-            <DatabaseCard
-              onClear={handleClearTransactions}
-              onReset={handleResetDatabase}
-              marginBottom={spacing.xxl}
-              padding={spacing.xl}
-            />
+          <View style={styles.peekCardContent}>
+            <Text style={styles.peekCardTitle}>Swipe to Review</Text>
+            <Text style={styles.peekCardSubtitle}>← Swipe right</Text>
           </View>
-
-          {/* Database Management Card */}
-          <View style={styles.dbCard}>
-            <Text style={styles.dbCardTitle}>Database Management</Text>
-            <Text style={styles.dbCardDescription}>
-              Manage your transaction data. Use with caution as these actions cannot be undone.
-            </Text>
-            <View style={styles.dbButtonsRow}>
-              <TouchableOpacity
-                style={[styles.dbButton, styles.clearButton]}
-                onPress={handleClearTransactions}
-              >
-                <Text style={styles.dbButtonText}>Clear Transactions</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dbButton, styles.resetButton]}
-                onPress={handleResetDatabase}
-              >
-                <Text style={styles.dbButtonText}>Reset Database</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
-
-    </AnimatedNavigationWrapper>
+        </Animated.View>
+      </SafeAreaView>
+    </ScreenShell>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    backgroundColor: '#8B5CF6', // Purple
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-  },
-  headerSpacer: {
-    height: Platform.OS === 'ios' ? 0 : 10,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-    fontFamily: Platform.OS === 'ios' ? 'System' : Platform.select({ android: 'Inter_600SemiBold' }) || 'sans-serif',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    opacity: 0.9,
-    letterSpacing: 0.5,
-  },
-  loadingContainer: {
+  safeAreaContent: {
     flex: 1,
   },
   centeredContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 400,
   },
   emptyText: {
     fontSize: 16,
@@ -500,140 +271,36 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
   },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  summaryCard: {
-    width: '48%',
+  peekCard: {
+    position: 'absolute',
+    top: '50%',
+    right: 20,
+    width: 200,
+    backgroundColor: 'rgba(139, 92, 246, 0.9)',
+    borderRadius: 16,
     padding: 20,
-    borderRadius: 20,
-    marginBottom: 16,
+    transform: [{ translateY: -50 }],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  confirmedCard: {
-    backgroundColor: '#e8f7f0', // Soft mint
+  peekCardContent: {
+    alignItems: 'center',
   },
-  foodCard: {
-    backgroundColor: '#fff5d9', // Pale yellow
-  },
-  rejectedCard: {
-    backgroundColor: '#ffe6e6', // Pale red
-  },
-  specialCard: {
-    backgroundColor: '#edf0ff', // Pale blue-lavender
-  },
-  pendingCard: {
-    backgroundColor: '#e4f8ff', // Light cyan
-  },
-  summaryCardTitle: {
-    fontSize: 13,
-    color: '#6B7280',
+  peekCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: 8,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
+    fontFamily: Platform.select({ ios: 'System', android: 'Inter_700Bold' }) || 'sans-serif',
   },
-  summaryCardValue: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 6,
-    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
-  },
-  summaryCardAmount: {
-    fontSize: 15,
-    color: '#4B5563',
-    fontWeight: '500',
-    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_500Medium' }) || 'sans-serif',
-  },
-  summaryCardSubtext: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    fontWeight: '400',
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
-  },
-  statsCard: {
-    marginBottom: 24,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-  },
-  statsCardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 16,
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  statRowLast: {
-    borderBottomWidth: 0,
-  },
-  statLabel: {
-    fontSize: 15,
-    color: '#6B7280',
-    fontWeight: '400',
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    fontFamily: Platform.select({ ios: 'System', android: 'SpaceGrotesk_600SemiBold' }) || 'sans-serif',
-  },
-  dbCard: {
-    marginBottom: 24,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-  },
-  dbCardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 12,
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_600SemiBold' }) || 'sans-serif',
-  },
-  dbCardDescription: {
+  peekCardSubtitle: {
+    color: '#FFFFFF',
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-    lineHeight: 20,
-    fontWeight: '400',
+    opacity: 0.9,
     fontFamily: Platform.select({ ios: 'System', android: 'Inter_400Regular' }) || 'sans-serif',
-  },
-  dbButtonsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dbButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  clearButton: {
-    backgroundColor: '#ffe6e6', // Soft red
-  },
-  resetButton: {
-    backgroundColor: '#fff5d9', // Soft yellow
-  },
-  dbButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#1A1A1A',
-    fontFamily: Platform.select({ ios: 'System', android: 'Inter_500Medium' }) || 'sans-serif-medium',
   },
 });
 
